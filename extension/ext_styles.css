@@ -1,0 +1,19 @@
+body {
+    font-family: Arial, sans-serif;
+    padding: 10px;
+}
+
+#css-selector,
+#xpath {
+    font-family: monospace;
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    padding: 5px;
+    border-radius: 5px;
+    word-wrap: break-word;
+    margin-bottom: 10px;
+}
+
+h2 {
+    margin-top: 0;
+}
