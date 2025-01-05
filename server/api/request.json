@@ -1,0 +1,59 @@
+{
+    "start_url": "https://www.findbook.ru/search/d1?title=451+градус+по+фаренгейту&r=0&s=1&viewsize=15&startidx=0",
+    "crawler_settings": {
+        "request_delay": 2,
+        "output_file_format": "json",
+        "pagination": {
+            "enabled": true,
+            "next_page_selector": {
+                "path": "//b[contains(@class, 'pagination__page--active')]/following-sibling::a[1]",
+                "selector_type": "xpath"
+            },
+            "start_page": 0,
+            "max_pages": 4,
+            "page_increment": 1
+        }
+    },
+    "meta": [
+        {
+            "object_name": "book",
+            "object_caption": "Книга",
+            "object_selector": {
+                "path": "//div[contains(@class, 'row results__line')]",
+                "selector_type": "xpath"
+            },
+            "attributes": [
+                {
+                    "attribute_name": "store_name",
+                    "attribute_caption": "Название магазина",
+                    "attribute_selector": {
+                        "path": ".//div[@class='results__shop-name']/a/text()",
+                        "selector_type": "xpath"
+                    },
+                    "attribute_type": "simple",
+                    "required": true
+                },
+                {
+                    "attribute_name": "isbn",
+                    "attribute_caption": "ISBN",
+                    "attribute_selector": {
+                        "path": ".//div[@class='results__isbn-item']/a/text()",
+                        "selector_type": "xpath"
+                    },
+                    "attribute_type": "simple",
+                    "required": false
+                },
+                {
+                    "attribute_name": "price",
+                    "attribute_caption": "Стоимость",
+                    "attribute_selector": {
+                        "path": ".//div[contains(@class, 'results__price')]/a/text()",
+                        "selector_type": "xpath"
+                    },
+                    "attribute_type": "simple",
+                    "required": true
+                }
+            ]
+        }
+    ]
+}
