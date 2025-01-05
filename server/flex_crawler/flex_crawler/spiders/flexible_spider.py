@@ -41,13 +41,13 @@ class FlexibleSpider(scrapy.Spider):
         for obj in meta_objects:
             object_selector_info = obj.get("object_selector", {})
             object_path = object_selector_info.get("path", "")
-            selector_type = object_selector_info.get("selector_type", "xpath")
+            object_selector_type = object_selector_info.get("selector_type", "xpath")
 
             if not object_path:
                 continue  # нет пути к объектам
 
             # Выбираем нужные элементы на странице
-            if selector_type == "xpath":
+            if object_selector_type == "xpath":
                 elements = response.xpath(object_path)
             else:  # css
                 elements = response.css(object_path)
@@ -57,23 +57,25 @@ class FlexibleSpider(scrapy.Spider):
                 # Парсим атрибуты
                 for attr in obj.get("attributes", []):
                     attr_name = attr.get("attribute_name")
-                    attr_selector = attr.get("attribute_selector", {})
-                    path = attr_selector.get("path", "")
-                    sel_type = attr_selector.get("selector_type", "xpath")
+
+                    attr_selector_info = attr.get("attribute_selector", {})
+                    attr_path = attr_selector_info.get("path", "")
+                    attr_selector_type = attr_selector_info.get("selector_type", "xpath")
+
                     attr_type = attr.get("attribute_type", "simple")
                     delimiter = attr.get("delimiter", ";")
 
-                    if sel_type == "xpath":
-                        sub_elements = el.xpath(path)
+                    if attr_selector_type == "xpath":
+                        sub_elements = el.xpath(attr_path)
                     else:
-                        sub_elements = el.css(path)
+                        sub_elements = el.css(attr_path)
 
                     if attr_type == "simple":
                         # берём первый найденный
                         extracted = sub_elements.get()
                         if extracted:
                             item_data[attr_name] = extracted.strip()
-                        elif attr.get("required"):
+                        elif attr.get("required"): #случай когда аттрибут обязателен, но его нет
                             raise ValueError(f"{attr_name} is required")  # Надо обсудить, зачем нам required
                         else:
                             item_data[attr_name] = None
@@ -91,7 +93,10 @@ class FlexibleSpider(scrapy.Spider):
         # 2. Логика пагинации
         pagination_settings = self.config.get("crawler_settings", {}).get("pagination", {})
         if pagination_settings.get("enabled"):
-            next_page_selector = pagination_settings.get("next_page_selector", "")
+            next_page_selector_info = pagination_settings.get("next_page_selector", {})
+            next_page_path = next_page_selector_info.get("path", "")
+            next_page_selector_type = next_page_selector_info.get("selector_type", "xpath")
+
             max_pages = pagination_settings.get("max_pages", 1)
             page_increment = pagination_settings.get("page_increment", 1)
 
@@ -116,12 +121,13 @@ class FlexibleSpider(scrapy.Spider):
                         callback=self.parse,
                         meta={"page_number": next_page_number}
                     )
-                elif next_page_selector:
+                elif next_page_selector_info:
                     # Когда указывается XPath/CSS селектор "кнопки" Следующая страница
-                    if next_page_selector.startswith("//"):
-                        next_page_el = response.xpath(next_page_selector)
+                    if next_page_selector_type == "xpath":
+                        next_page_el = response.xpath(next_page_path)
                     else:
-                        next_page_el = response.css(next_page_selector)
+                        next_page_el = response.css(next_page_path)
+
                     next_page_link = next_page_el.attrib.get("href")
                     if next_page_link:
                         yield response.follow(
