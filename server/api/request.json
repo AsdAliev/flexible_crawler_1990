@@ -30,8 +30,7 @@
                         "path": ".//div[@class='results__shop-name']/a/text()",
                         "selector_type": "xpath"
                     },
-                    "attribute_type": "simple",
-                    "required": true
+                    "attribute_type": "simple"
                 },
                 {
                     "attribute_name": "isbn",
@@ -40,8 +39,7 @@
                         "path": ".//div[@class='results__isbn-item']/a/text()",
                         "selector_type": "xpath"
                     },
-                    "attribute_type": "simple",
-                    "required": false
+                    "attribute_type": "simple"
                 },
                 {
                     "attribute_name": "price",
@@ -50,8 +48,7 @@
                         "path": ".//div[contains(@class, 'results__price')]/a/text()",
                         "selector_type": "xpath"
                     },
-                    "attribute_type": "simple",
-                    "required": true
+                    "attribute_type": "simple"
                 }
             ]
         }

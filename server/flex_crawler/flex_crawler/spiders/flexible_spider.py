@@ -75,8 +75,6 @@ class FlexibleSpider(scrapy.Spider):
                         extracted = sub_elements.get()
                         if extracted:
                             item_data[attr_name] = extracted.strip()
-                        elif attr.get("required"): #случай когда аттрибут обязателен, но его нет
-                            raise ValueError(f"{attr_name} is required")  # Надо обсудить, зачем нам required
                         else:
                             item_data[attr_name] = None
                     elif attr_type == "array":
@@ -84,9 +82,6 @@ class FlexibleSpider(scrapy.Spider):
                         all_values = [v.get().strip() for v in sub_elements if v.get()]
                         # можно склеить через delimiter или хранить список
                         item_data[attr_name] = delimiter.join(all_values)
-
-                # Здесь можно применить дополнительную логику, например, для "object" атрибутов
-                # Надо обсудить
 
                 yield item_data
 

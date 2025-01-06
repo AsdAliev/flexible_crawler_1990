@@ -6,7 +6,6 @@
             "Accept-Language": "en-US,en;q=0.9"
         },
         "request_delay": 2,
-        "max_depth": 3,
         "output_file_format": "csv",
         "pagination": {
             "enabled": true,
@@ -36,8 +35,7 @@
                         "path": "//b[@class='results__title-name']",
                         "selector_type": "xpath"
                     },
-                    "attribute_type": "simple",
-                    "required": true
+                    "attribute_type": "simple"
                 },
                 {
                     "attribute_name": "author",
@@ -46,12 +44,7 @@
                         "path": "h4.results__title",
                         "selector_type": "css"
                     },
-                    "attribute_type": "simple",
-                    "required": false,
-                    "fallback": {
-                        "path": "//span[@class='author-name']",
-                        "selector_type": "xpath"
-                    }
+                    "attribute_type": "simple"
                 },
                 {
                     "attribute_name": "offer",
@@ -76,8 +69,7 @@
                         "path": "//span[@class='price']",
                         "selector_type": "xpath"
                     },
-                    "attribute_type": "simple",
-                    "required": true
+                    "attribute_type": "simple"
                 },
                 {
                     "attribute_name": "link",
@@ -86,8 +78,7 @@
                         "path": "//a[@class='offer-link']",
                         "selector_type": "xpath"
                     },
-                    "attribute_type": "simple",
-                    "required": false
+                    "attribute_type": "simple"
                 }
             ]
         }
