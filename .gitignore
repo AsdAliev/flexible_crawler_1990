@@ -15,7 +15,8 @@ coverage.xml
 
 __pycache__/
 
-*.json
 *.xml
 *.csv
 test.py
+results
+schemas
