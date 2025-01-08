@@ -226,28 +226,47 @@ objectForm.addEventListener("submit", (event) => {
     // If all fields are valid, process the data
     const formData = new FormData(objectForm);
     const data = {};
+    data.start_url = '';
+    data.crawler_settings = {
+        request_delay: 2,
+        output_file_format: 'json'
+    }
 
     // Add NOTE data if the checkbox is checked
     if (noteCheckbox.checked) {
-        data.note = {
-            name: formData.get("noteName"),
-            info: formData.get("noteInfo"),
+        data.crawler_settings.pagination = {
+            enabled: true,
+            next_page_selector: {
+                path: formData.get("noteInfo"),
+                selector_type: 'xpath'
+            },
+            start_page: 0,
+            max_pages: 4,
+            page_increment: 1,
+            url_param_template: formData.get("noteName")
         };
+    } else {
+        data.crawler_settings.pagination.enabled = false;
     }
 
     // Organize the data into objects and attributes
     const objectNames = formData.getAll("objectName[]");
-    const objectInfos = formData.getAll("objectPath[]");
+    const objectPaths = formData.getAll("objectPath[]");
     const attributeNames = formData.getAll("attributeName[]");
-    const attributeInfos = formData.getAll("attributePath[]");
+    const attributePaths = formData.getAll("attributePath[]");
 
     // Group data by objects
     let attributeIndex = 0;
+    data.meta = [];
     objectNames.forEach((name, index) => {
         const object = {
-            name,
-            path: objectInfos[index],
-            attributes: [],
+            object_name: name,
+            object_caption: name,
+            object_selector: {
+                path: objectPaths[index],
+                selector_type: 'xpath'
+            },
+            attributes: []
         };
 
         // Find attributes for the current object
@@ -256,14 +275,46 @@ objectForm.addEventListener("submit", (event) => {
 
         attributeDivs.forEach(() => {
             object.attributes.push({
-                name: attributeNames[attributeIndex],
-                path: attributeInfos[attributeIndex],
+                attribute_name: attributeNames[attributeIndex],
+                attribute_caption: attributeNames[attributeIndex],
+                attribute_selector: {
+                    path: attributePaths[attributeIndex],
+                    selector_type: 'xpath'
+                },
+                attribute_type: 'simple',
+                required: true
             });
             attributeIndex++;
         });
 
-        data[`Object ${index + 1}`] = object;
+        data.meta.push(object);
     });
 
-    console.log(data); // Print all data to the console
+    sendParsingTask(data);
+    console.log(data);
 });
+
+async function sendParsingTask(data) {
+    const apiUrl = 'http://localhost:8000/start_crawler';
+    data.start_url = await chrome.runtime.sendMessage({ action: "getActiveTab" });
+    data.start_url = data.start_url.url || 'No URL data';
+    console.log(data.start_url);
+    let id = undefined;
+    try {
+        const response = await fetch(apiUrl, {
+            method: "POST",
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        })
+        if (!response.ok) {
+            throw new Error(`Error HTTP: ${response.status}`);
+        }
+        id = await response.json()
+    } catch (error) {
+        console.error('Error:', error);
+    }
+
+    return id;
+}

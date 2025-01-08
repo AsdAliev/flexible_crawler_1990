@@ -19,3 +19,16 @@ chrome.runtime.onConnect.addListener(devToolsConnection => {
         devToolsConnection.onMessage.removeListener(devToolsListener);
     });
 });
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.action === "getActiveTab") {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+            if (tabs && tabs.length > 0) {
+                sendResponse({ url: tabs[0].url });
+            } else {
+                sendResponse({ url: null });
+            }
+        });
+        return true; // Keep the messaging channel open for async response
+    }
+});

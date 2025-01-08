@@ -3,6 +3,13 @@
     "name": "DOM Crawler",
     "version": "0.1",
     "description": "Chose parsed elements and send parsing map to the server.",
+    "permissions": [
+        "activeTab",
+        "tabs"
+    ],
+    "host_permissions": [
+        "<all_urls>"
+    ],
     "action": {
         "default_popup": "popup/popup.html",
         "default_icon": {
