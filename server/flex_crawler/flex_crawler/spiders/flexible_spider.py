@@ -1,7 +1,7 @@
 import json
 import scrapy
 import os
-
+import random
 
 def get_element_by_selector(response, path, type):
     if type == 'xpath':
@@ -23,6 +23,13 @@ class FlexibleSpider(scrapy.Spider):
         if self.config_path and os.path.exists(self.config_path):
             with open(self.config_path, "r", encoding="utf-8") as f:
                 self.config = json.load(f)
+        self.allowed_domains = self.config.get('crawler_settings', {}).get('allowed_domains', all)
+
+        # Загружаем User-Agent'ы из файла
+        self.user_agent_list = []
+        if os.path.exists(os.path.join(os.path.dirname(__file__), "user_agents.txt")):
+            with open(os.path.join(os.path.dirname(__file__), "user_agents.txt"), "r", encoding="utf-8") as f:
+                self.user_agent_list = [line.strip() for line in f if line.strip()]
 
     def start_requests(self):
         # Берём start_url из конфигурации
@@ -30,7 +37,10 @@ class FlexibleSpider(scrapy.Spider):
         if start_url:
             yield scrapy.Request(
                 url=start_url,
-                callback=self.parse
+                callback=self.parse,
+                headers={
+                    "User_Agent": self.user_agent_list[random.randint(0, len(self.user_agent_list)-1)]
+                }
             )
 
     def parse(self, response):
@@ -90,7 +100,10 @@ class FlexibleSpider(scrapy.Spider):
                                 callback=self.parse_links,
                                 meta={"linked_attributes": attr.get("linked_attributes", []),
                                       "item_data": item_data,
-                                      "attribute_caption": attribute_caption}
+                                      "attribute_caption": attribute_caption},
+                                headers={
+                                    "User_Agent": self.user_agent_list[random.randint(0, len(self.user_agent_list)-1)]
+                                }
                             )
                 yield item_data
 
@@ -123,7 +136,10 @@ class FlexibleSpider(scrapy.Spider):
                     yield scrapy.Request(
                         url=next_url,
                         callback=self.parse,
-                        meta={"page_number": next_page_number}
+                        meta={"page_number": next_page_number},
+                        headers={
+                            "User_Agent": self.user_agent_list[random.randint(0, len(self.user_agent_list)-1)]
+                        }
                     )
                 elif next_page_selector_info:
                     # Когда указывается XPath/CSS селектор "кнопки" Следующая страница
@@ -134,7 +150,10 @@ class FlexibleSpider(scrapy.Spider):
                         yield response.follow(
                             next_page_link,
                             callback=self.parse,
-                            meta={"page_number": current_page + page_increment}
+                            meta={"page_number": current_page + page_increment},
+                            headers={
+                                "User_Agent": self.user_agent_list[random.randint(0, len(self.user_agent_list)-1)]
+                            }
                         )
 
     def parse_links(self, response):
