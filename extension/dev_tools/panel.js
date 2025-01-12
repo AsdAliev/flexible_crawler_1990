@@ -1,5 +1,16 @@
-//TODO: Fetch request
+import { getCssSelector, getXPath } from "./path-suggest.js";
+import {
+    PathData, Attribute, ObjectMeta,
+    PaginationSettings, CrawlerSettings, CrawlerRequest
+} from "./api-classes.js";
 
+const objectsContainer = document.getElementById("objectsContainer");
+const addObjectButton = document.getElementById("addObjectButton");
+const objectForm = document.getElementById("objectForm");
+const noteCheckbox = document.getElementById("noteCheckbox");
+const noteSection = document.getElementById("noteSection");
+const noteName = document.getElementById("noteName");
+const noteInfo = document.getElementById("noteInfo");
 /**
  * input, в который будет вписан путь (xpath, css)
  */
@@ -36,77 +47,10 @@ chrome.devtools.panels.elements.onSelectionChanged.addListener(() => {
     );
 });
 
-/**
- * Function to compute the CSS Selector
- * @param {HTMLElement} element 
- * @returns {string}
- */
-function getCssSelector(element) {
-    if (!element) return "No element selected.";
-    const parts = [];
-    while (element.parentElement) {
-        let part = element.tagName.toLowerCase();
-        if (element.id) {
-            part += `#${element.id}`;
-            parts.unshift(part);
-            break;
-        } else {
-            let sibling = element;
-            let nth = 1;
-            while ((sibling = sibling.previousElementSibling)) {
-                if (sibling.tagName === element.tagName) nth++;
-            }
-            if (nth > 1) part += `:nth-of-type(${nth})`;
-        }
-        parts.unshift(part);
-        element = element.parentElement;
-    }
-    return parts.join(" > ");
-}
 
-/**
- * Function to compute the XPath
- * @param {HTMLElement} element 
- * @returns {string}
- */
-function getXPath(element) {
-    if (!element) return "No element selected.";
-    const getPath = (el) => {
-        if (el.id) {
-            return `//*[@id='${el.id}']`;
-        } else if (el === document.body) {
-            return "/html/body";
-        }
-        let ix = 0;
-        const siblings = el.parentNode.childNodes;
-        for (let i = 0; i < siblings.length; i++) {
-            const sibling = siblings[i];
-            if (sibling === el) {
-                return (
-                    getPath(el.parentNode) +
-                    "/" +
-                    el.tagName.toLowerCase() +
-                    (ix > 0 ? `[${ix + 1}]` : "")
-                );
-            }
-            if (sibling.nodeType === 1 && sibling.tagName === el.tagName) {
-                ix++;
-            }
-        }
-    };
-    return getPath(element);
-}
-
-const objectsContainer = document.getElementById("objectsContainer");
-const addObjectButton = document.getElementById("addObjectButton");
-const objectForm = document.getElementById("objectForm");
-const noteCheckbox = document.getElementById("noteCheckbox");
-const noteSection = document.getElementById("noteSection");
-const noteName = document.getElementById("noteName");
-const noteInfo = document.getElementById("noteInfo");
 
 noteInfo.addEventListener('focus', () => {
-    forPathElements = document.getElementsByClassName('for-path');
+    let forPathElements = document.getElementsByClassName('for-path');
     for (let i = 0; i < forPathElements.length; i++) {
         if (forPathElements[i] != noteInfo) {
             forPathElements[i].classList.remove('for-path-selected');
@@ -131,7 +75,7 @@ function addObject() {
     objectCard.className = "object-card";
 
     objectCard.innerHTML = `
-                <button type="button" class="button remove-button removeObjectButton">Remove Object</button>
+                <button type="button" class="btn-main remove-btn removeObjectButton">Remove Object</button>
                 <p>
                     Object Name: <input type="text" name="objectName[]" required>
                 </p>
@@ -139,12 +83,12 @@ function addObject() {
                     Object Path: <input type="text" class="for-path" name="objectPath[]" required>
                 </p>
                 <div class="attributesContainer"></div>
-                <button type="button" class="button addAttributeButton">+ Add Attribute</button>
+                <button type="button" class="btn-main addAttributeButton">+ Add Attribute</button>
             `;
 
     const objectPathInput = objectCard.querySelector(".for-path");
     objectPathInput.addEventListener('focus', () => {
-        forPathElements = document.getElementsByClassName('for-path');
+        let forPathElements = document.getElementsByClassName('for-path');
         for (let i = 0; i < forPathElements.length; i++) {
             if (forPathElements[i] != objectPathInput) {
                 forPathElements[i].classList.remove('for-path-selected');
@@ -174,11 +118,11 @@ function addObject() {
                     <p>
                         Attribute Path: <input type="text" class="for-path" name="attributePath[]" required>
                     </p>
-                    <button type="button" class="button remove-button removeAttributeButton">Remove Attribute</button>
+                    <button type="button" class="btn-main remove-btn removeAttributeButton">Remove Attribute</button>
                 `;
         const attributePathInput = attributeDiv.querySelector(".for-path");
         attributePathInput.addEventListener('focus', () => {
-            forPathElements = document.getElementsByClassName('for-path');
+            let forPathElements = document.getElementsByClassName('for-path');
             for (let i = 0; i < forPathElements.length; i++) {
                 if (forPathElements[i] != attributePathInput) {
                     forPathElements[i].classList.remove('for-path-selected');
@@ -206,7 +150,7 @@ addObjectButton.addEventListener("click", addObject);
 objectForm.addEventListener("submit", (event) => {
     event.preventDefault(); // Prevent the default form submission
     let isValid = true;
-    const inputs = objectForm.querySelectorAll("input");
+    const inputs = objectForm.querySelectorAll("form-input");
 
     // Check if all fields are filled
     inputs.forEach(input => {
@@ -225,7 +169,9 @@ objectForm.addEventListener("submit", (event) => {
 
     // If all fields are valid, process the data
     const formData = new FormData(objectForm);
+
     const data = {};
+
     data.start_url = '';
     data.crawler_settings = {
         request_delay: 2,

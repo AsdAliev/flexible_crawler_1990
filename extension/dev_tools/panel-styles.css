@@ -30,7 +30,7 @@ h2 {
     margin-left: 20px;
 }
 
-.button {
+.btn-main {
     margin-top: 10px;
     display: inline-block;
     padding: 5px 10px;
@@ -42,16 +42,16 @@ h2 {
     cursor: pointer;
 }
 
-.button:hover {
+.btn-main:hover {
     background-color: #0056b3;
 }
 
-.remove-button {
+.remove-btn {
     background-color: #dc3545;
     border-color: #dc3545;
 }
 
-.remove-button:hover {
+.remove-btn:hover {
     background-color: #c82333;
 }
 
@@ -59,7 +59,7 @@ h2 {
     display: none;
 }
 
-input:invalid {
+.form-input:invalid {
     border-color: red;
 }
 
