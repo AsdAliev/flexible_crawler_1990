@@ -19,8 +19,9 @@ class Attribute(BaseModel):
     attribute_name: str = Field(..., description="Уникальное имя атрибута для сбора данных")
     attribute_caption: str = Field(..., description="Читаемое имя атрибута для отображения")
     attribute_selector: Selector = Field(..., description="Селектор для поиска атрибута")
-    attribute_type: Literal["simple", "array"] = Field(..., description="Тип атрибута: simple или array")
+    attribute_type: Literal["simple", "array", "link"] = Field(..., description="Тип атрибута: simple или array")
     delimiter: Optional[str] = Field(None, description="Разделитель для типа array")
+    linked_attributes: Optional[List["Attribute"]] = Field(None, description="Список атрибутов для сайта по ссылке")
 
 # Модель для описания объектов
 class ObjectMeta(BaseModel):
@@ -43,6 +44,7 @@ class CrawlerSettings(BaseModel):
     request_headers: Optional[Dict[str, str]] = Field(None, description="Заголовки для HTTP-запросов") #возможно удалим
     request_delay: Optional[int] = Field(1, description="Задержка между запросами (в секундах)")
     output_file_format: Literal["json", "csv", "xml"] = Field(..., description="Формат файла для сохранения результатов")
+    allowed_domains: Optional[List[str]] = Field(None, description="Домены, разрешенные для краулинга")
     pagination: PaginationSettings = Field(..., description="Настройки пагинации")
 
 # Основная модель для входящего запроса

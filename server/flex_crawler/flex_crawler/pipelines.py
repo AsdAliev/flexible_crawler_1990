@@ -8,7 +8,7 @@ class FlexibleExportPipeline:
             self.exporter = JsonItemExporter(self.file, encoding='utf-8', ensure_ascii=False)
         elif spider.output_format == "csv":
             self.file = open(spider.output_path, "wb")
-            self.exporter = CsvItemExporter(self.file, include_headers_line=True)
+            self.exporter = CsvItemExporter(self.file, encoding='utf-8', include_headers_line=True)
         elif spider.output_format == "xml":
             self.file = open(spider.output_path, "wb")
             self.exporter = XmlItemExporter(self.file)
