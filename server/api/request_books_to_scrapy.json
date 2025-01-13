@@ -1,0 +1,96 @@
+{
+    "start_url": "https://books.toscrape.com/catalogue/page-1.html",
+    "crawler_settings": {
+        "request_delay": 2,
+        "output_file_format": "json",
+        "allowed_domains": ["books.toscrape.com"],
+        "pagination": {
+            "enabled": true,
+            "next_page_selector": {
+                "path": "//li[@class='next']/a",
+                "selector_type": "xpath"
+            },
+            "url_param_template": "page-{page_number}.html",
+            "start_page": 1,
+            "max_pages": 50,
+            "page_increment": 1
+        }
+    },
+    "meta": [
+        {
+            "object_name": "book",
+            "object_caption": "Книга",
+            "object_selector": {
+                "path": "//article[@class='product_pod']",
+                "selector_type": "xpath"
+            },
+            "attributes": [
+                {
+                    "attribute_name": "name",
+                    "attribute_caption": "Название",
+                    "attribute_selector": {
+                        "path": "./h3/a/@title",
+                        "selector_type": "xpath"
+                    },
+                    "attribute_type": "simple"
+                },
+                {
+                    "attribute_name": "price",
+                    "attribute_caption": "Цена",
+                    "attribute_selector": {
+                        "path": ".//p[@class='price_color']/text()",
+                        "selector_type": "xpath"
+                    },
+                    "attribute_type": "simple"
+                },
+                {
+                    "attribute_name": "availability",
+                    "attribute_caption": "Наличие",
+                    "attribute_selector": {
+                        "path": ".//p[contains(@class, 'instock')]/text()",
+                        "selector_type": "xpath"
+                    },
+                    "attribute_type": "simple"
+                },
+                {
+                    "attribute_name": "rating",
+                    "attribute_caption": "Рейтинг",
+                    "attribute_selector": {
+                        "path": "./p[contains(@class, 'star-rating')]/@class",
+                        "selector_type": "xpath"
+                    },
+                    "attribute_type": "simple"
+                },
+                {
+                    "attribute_name": "link",
+                    "attribute_caption": "Cтраница книги",
+                    "attribute_selector": {
+                        "path": "./h3/a/@href",
+                        "selector_type": "xpath"
+                    },
+                    "attribute_type": "link",
+                    "linked_attributes": [
+                        {
+                            "attribute_name": "description",
+                            "attribute_caption": "Описание",
+                            "attribute_selector": {
+                                "path": "//meta[@name='description']/@content",
+                                "selector_type": "xpath"
+                            },
+                            "attribute_type": "simple"
+                        },
+                        {
+                            "attribute_name": "category",
+                            "attribute_caption": "Категория",
+                            "attribute_selector": {
+                                "path": "//ul[@class='breadcrumb']/li[3]/a/text()",
+                                "selector_type": "xpath"
+                            },
+                            "attribute_type": "simple"
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

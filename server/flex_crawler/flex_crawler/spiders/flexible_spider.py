@@ -62,9 +62,10 @@ class FlexibleSpider(scrapy.Spider):
 
             for element in elements:
                 item_data = {}
+                links_to_follow = []  # Список ссылок для последующей обработки
+
                 # Парсим атрибуты
                 for attr in object.get("attributes", []):
-                    # attr_name = attr.get("attribute_name")
                     attribute_caption = attr.get("attribute_caption")
 
                     attr_selector_info = attr.get("attribute_selector", {})
@@ -77,29 +78,36 @@ class FlexibleSpider(scrapy.Spider):
                     sub_elements = get_element_by_selector(element, attr_path, attr_selector_type)
 
                     if attr_type == "simple":
-                        # берём первый найденный
                         extracted = sub_elements.get()
-                        if extracted:
-                            item_data[attribute_caption] = extracted.strip()
-                        else:
-                            item_data[attribute_caption] = None
+                        item_data[attribute_caption] = extracted.strip() if extracted else None
                     elif attr_type == "array":
-                        # собираем все в массив
                         all_values = [v.get().strip() for v in sub_elements if v.get()]
-                        # можно склеить через delimiter или хранить список
                         item_data[attribute_caption] = delimiter.join(all_values)
                     elif attr_type == "link":
-                        # Если это ссылка, переходим по ней
-                        link = sub_elements.attrib.get("href")
+                        link = sub_elements.get("href")
                         if link:
-                            yield response.follow(
-                                link,
-                                callback=self.parse_links,
-                                meta={"linked_attributes": attr.get("linked_attributes", []),
-                                      "item_data": item_data,
-                                      "attribute_caption": attribute_caption}
-                            )
-                yield item_data
+                            links_to_follow.append({
+                                "link": link,
+                                "linked_attributes": attr.get("linked_attributes", [])
+                            })
+
+                # Если есть ссылки, запускаем обработку
+                if links_to_follow:
+                    # Указываем общее количество ссылок
+                    remaining_links = len(links_to_follow)
+                    for link_info in links_to_follow:
+                        yield response.follow(
+                            link_info["link"],
+                            callback=self.parse_links,
+                            meta={
+                                "linked_attributes": link_info["linked_attributes"],
+                                "item_data": item_data,
+                                "remaining_links": remaining_links
+                            }
+                        )
+                else:
+                    # Если ссылок нет, сразу сохраняем объект
+                    yield item_data
 
         # 2. Логика пагинации
         pagination_settings = self.config.get("crawler_settings", {}).get("pagination", {})
@@ -126,6 +134,10 @@ class FlexibleSpider(scrapy.Spider):
                         url_param_template.format(page_number=current_page),
                         url_param_template.format(page_number=next_page_number)
                     )
+                    
+                    print('***************************************************************************')
+                    print(next_url)
+                    print('***************************************************************************')
 
                     yield scrapy.Request(
                         url=next_url,
@@ -150,11 +162,11 @@ class FlexibleSpider(scrapy.Spider):
         В response meta лежит 
         * список аттрибутов, которые будем брать с нового сайта,
         * уже собранная информация про объект
-        * читаемое название аттрибута(по сути описание ссылки нового сайта)
+        * количество ссылок, чтобы не повторяться в результатах
         """
         linked_attributes = response.meta.get("linked_attributes", [])
         item_data = response.meta.get("item_data", {})
-        attribute_caption = response.meta.get("attribute_caption", "")
+        remaining_links = response.meta.get("remaining_links", 1) - 1  # Уменьшаем счётчик ссылок
 
         for linked_attr in linked_attributes:
             linked_attr_caption = linked_attr.get("attribute_caption")
@@ -166,9 +178,12 @@ class FlexibleSpider(scrapy.Spider):
             sub_elements = get_element_by_selector(response, linked_attr_path, linked_attr_selector_type)
 
             extracted = sub_elements.get()
-            if extracted:
-                item_data[f"{attribute_caption}::{linked_attr_caption}"] = extracted.strip()
-            else:
-                item_data[f"{attribute_caption}::{linked_attr_caption}"] = None
+            item_data[linked_attr_caption] = extracted.strip() if extracted else None
 
-        yield item_data
+        if remaining_links == 0:
+            # Сохраняем объект только после обработки последней ссылки
+            yield item_data
+        else:
+            # Передаём обновлённое количество оставшихся ссылок
+            response.meta["remaining_links"] = remaining_links
+
