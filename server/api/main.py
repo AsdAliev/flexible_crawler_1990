@@ -1,5 +1,5 @@
 from fastapi import FastAPI, BackgroundTasks
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import ValidationError
 import uvicorn
 import subprocess
@@ -50,7 +50,13 @@ def start_crawler(data: dict, background_tasks: BackgroundTasks):
     try:
         validated_data = CrawlerRequest(**data)
     except ValidationError as e:
-        return {"task_id": task_id, "status": "Validation failed", "details": e.errors()}
+        return JSONResponse(
+            content={
+                "task_id": task_id,
+                "details": e.errors()
+            },
+            status_code=422 #ошибка валидации
+        )
 
     # Сохраняем полученный JSON во временный файл (или в базу) —
     # затем паук сможет прочитать этот файл, чтобы знать, что именно парсить.
@@ -64,7 +70,7 @@ def start_crawler(data: dict, background_tasks: BackgroundTasks):
 
     # Обновляем статус задачи
     with status_lock:
-        task_data[task_id] = {"status": "in_progress", "format": output_format}
+        task_data[task_id] = {"status": "in progress", "format": output_format}
 
     # Запускаем Scrapy через subprocess, передавая нужные аргументы
     # Обратите внимание, что flexible_spider должен уметь получать task_id и config_path
@@ -88,7 +94,13 @@ def start_crawler(data: dict, background_tasks: BackgroundTasks):
     # Запускаем краулер в фоне
     background_tasks.add_task(run_crawler)
 
-    return {"task_id": task_id, "status": "Crawler started"}
+    return JSONResponse(
+        content={
+            "task_id": task_id,
+            "status": "crawler started"
+        },
+        status_code=200
+    )
 
 
 @app.get("/status/{task_id}")
@@ -101,9 +113,21 @@ def get_status(task_id: str):
         current_data = task_data.get(task_id, None)
 
     if current_data is None:
-        return {"task_id": task_id, "status": "not_found"}
+        return JSONResponse(
+            content={
+                "task_id": task_id,
+                "description": "Такой задачи не существует"
+            },
+            status_code=404
+        )
 
-    return {"task_id": task_id, "status": current_data["status"]}
+    return JSONResponse(
+        content={
+            "task_id": task_id,
+            "status": current_data["status"]
+        },
+        status_code=200
+    )
 
 
 
@@ -111,34 +135,72 @@ def get_status(task_id: str):
 def get_result(task_id: str):
     """
     Эндпоинт для получения файла результата задачи по Task ID.
-    Возвращает файл в заданном формате.
+    Возвращает файл в заданном формате, либо сообщение об ошибке в формате JSON.
     """
     with status_lock:
         current_data = task_data.get(task_id, None)
 
-    if current_data["status"] == "completed":
-        output_format = current_data["format"]
-        output_path = os.path.join(RESULTS_DIR, f"{task_id}_result.{output_format}")
+    # Проверяем наличие задачи
+    if not current_data:
+        return JSONResponse(
+            content={
+                "task_id": task_id,
+                "description": "Такой задачи не существует"
+            },
+            status_code=404
+        )
 
-        if os.path.exists(output_path):
-            return FileResponse(
-                path=output_path,
-                filename=f"{task_id}_result.{output_format}",
-                media_type="application/octet-stream"
-            )
+    # Проверяем статус задачи
+    if current_data["status"] == "in progress":
+        return JSONResponse(
+            content={
+                "task_id": task_id,
+                "status": "in progress",
+                "message": "Задание еще не выполнено. Попробуйте позже"
+            },
+            status_code=202  # 202 Accepted — запрос принят, но не завершен
+        )
+
+    # Путь к результату
+    output_format = current_data["format"]
+    output_path = os.path.join(RESULTS_DIR, f"{task_id}_result.{output_format}")
+
+    # Проверяем существование файла
+    if not os.path.exists(output_path):
+        return JSONResponse(
+            content={
+                "task_id": task_id,
+                "description": "Файл для данной задачи не найден"
+            },
+            status_code=404
+        )
+
+    # Возвращаем файл, если он существует
+    return FileResponse(
+        path=output_path,
+        filename=f"{task_id}_result.{output_format}",
+        media_type="application/octet-stream"
+    )
+
 
 
 @app.delete("/delete/{task_id}")
 def delete_files(task_id: str):
     """
     Эндпоинт для удаления промежуточной схемы и результата задачи по Task ID.
-    Возвращает сообщение с результатом, какие файлы были удалены
+    Возвращает JSON с результатом: какие файлы были удалены и статус задачи.
     """
     with status_lock:
         current_data = task_data.get(task_id, None)
 
     if not current_data:
-        return {"task_id": task_id, "status": "not_found", "message": "Task ID not found."}
+        return JSONResponse(
+            content={
+                "task_id": task_id,
+                "description": "Такой задачи не существует"
+            },
+            status_code=404
+        )
 
     # Путь к файлам
     config_path = os.path.join(SCHEMAS_DIR, f"{task_id}_config.json")
@@ -155,12 +217,20 @@ def delete_files(task_id: str):
     # Удаляем запись о задаче из словаря статусов
     del task_data[task_id]
 
-    return {
-        "task_id": task_id,
-        "status": "deleted",
-        "deleted_files": files_deleted,
-        "message": "Files and task data successfully deleted." if files_deleted else "No files found to delete."
-    }
+    return JSONResponse(
+        content={
+            "task_id": task_id,
+            "status": "deleted",
+            "deleted_files": files_deleted,
+            "message": (
+                "Файлы и данные были успещно удалены" 
+                if files_deleted else 
+                "Файлов нет, но остальные данные были удалены"
+            )
+        },
+        status_code=200
+    )
+
 
 
 if __name__ == "__main__":

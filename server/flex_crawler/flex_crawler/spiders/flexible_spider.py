@@ -37,10 +37,7 @@ class FlexibleSpider(scrapy.Spider):
         if start_url:
             yield scrapy.Request(
                 url=start_url,
-                callback=self.parse,
-                headers={
-                    "User_Agent": self.user_agent_list[random.randint(0, len(self.user_agent_list)-1)]
-                }
+                callback=self.parse
             )
 
     def parse(self, response):
@@ -100,10 +97,7 @@ class FlexibleSpider(scrapy.Spider):
                                 callback=self.parse_links,
                                 meta={"linked_attributes": attr.get("linked_attributes", []),
                                       "item_data": item_data,
-                                      "attribute_caption": attribute_caption},
-                                headers={
-                                    "User_Agent": self.user_agent_list[random.randint(0, len(self.user_agent_list)-1)]
-                                }
+                                      "attribute_caption": attribute_caption}
                             )
                 yield item_data
 
@@ -136,10 +130,7 @@ class FlexibleSpider(scrapy.Spider):
                     yield scrapy.Request(
                         url=next_url,
                         callback=self.parse,
-                        meta={"page_number": next_page_number},
-                        headers={
-                            "User_Agent": self.user_agent_list[random.randint(0, len(self.user_agent_list)-1)]
-                        }
+                        meta={"page_number": next_page_number}
                     )
                 elif next_page_selector_info:
                     # Когда указывается XPath/CSS селектор "кнопки" Следующая страница
@@ -150,10 +141,7 @@ class FlexibleSpider(scrapy.Spider):
                         yield response.follow(
                             next_page_link,
                             callback=self.parse,
-                            meta={"page_number": current_page + page_increment},
-                            headers={
-                                "User_Agent": self.user_agent_list[random.randint(0, len(self.user_agent_list)-1)]
-                            }
+                            meta={"page_number": current_page + page_increment}
                         )
 
     def parse_links(self, response):
