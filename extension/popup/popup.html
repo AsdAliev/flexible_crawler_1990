@@ -1,15 +1,50 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="en">
 <head>
-    <meta charset="UTF-8" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Popup</title>
+    <link rel="stylesheet" href="popup-styles.css">
 </head>
-
 <body>
-    <h1>
-        Здесь будут ответы с сервера и настройки
-    </h1>
+    <!-- Вкладки для переключения -->
+    <div class="tabs">
+        <button class="tab active" data-tab="settingsTab">Settings</button>
+        <button class="tab" data-tab="requestsTab">Requests</button>
+    </div>
+
+    <!-- Контейнер для вкладки настроек -->
+    <div id="settingsTab" class="content-container active">
+        <form id="settingsForm">
+            <!-- Настройки пагинации -->
+            <label>
+                <input type="checkbox" id="enablePagination">
+                Enable Pagination
+            </label>
+            <div id="paginationSettings" class="hidden">
+                <p>URL Parameter Template: <input type="text" id="urlParamTemplate"></p>
+                <p>Next Page Selector (XPath): <input type="text" id="nextPageSelector"></p>
+            </div>
+            <button type="button" id="saveSettingsButton" class="btn-main">Save Settings</button>
+        </form>
+    </div>
+
+    <!-- Контейнер для вкладки запросов -->
+    <div id="requestsTab" class="content-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Request ID</th>
+                    <th>URL</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="requestsTableBody">
+                <!-- Таблица будет заполняться динамически -->
+            </tbody>
+        </table>
+    </div>
+
     <script src="popup.js"></script>
 </body>
-
 </html>
