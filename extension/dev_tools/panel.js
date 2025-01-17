@@ -69,8 +69,46 @@ noteCheckbox.addEventListener("change", () => {
     }
 });
 
-// Function to add a new object
-function addObject() {
+/**
+ * 
+ * @param {HTMLElement} attributesContainer 
+ */
+function addParseAttribute(attributesContainer) {
+    const attributeDiv = document.createElement("div");
+    attributeDiv.className = "attribute";
+    attributeDiv.innerHTML = `
+                    <p>
+                        Attribute Name: <input type="text" name="attributeName[]" required>
+                    </p>
+                    <p>
+                        Attribute Path: <input type="text" class="for-path" name="attributePath[]" required>
+                    </p>
+                    <button type="button" class="btn-main remove-btn removeAttributeButton">Remove Attribute</button>
+                `;
+    const attributePathInput = attributeDiv.querySelector(".for-path");
+    attributePathInput.addEventListener('focus', () => {
+        let forPathElements = document.getElementsByClassName('for-path');
+        for (let i = 0; i < forPathElements.length; i++) {
+            if (forPathElements[i] != attributePathInput) {
+                forPathElements[i].classList.remove('for-path-selected');
+            }
+        }
+        selectedInput = attributePathInput;
+        attributePathInput.classList.add('for-path-selected');
+    });
+    // Add functionality to remove attributes
+    const removeAttributeButton = attributeDiv.querySelector(".removeAttributeButton");
+    removeAttributeButton.addEventListener("click", () => {
+        attributesContainer.removeChild(attributeDiv);
+    });
+
+    attributesContainer.appendChild(attributeDiv);
+}
+
+/**
+ * Function to add a new object
+ */
+function addParseObject() {
     const objectCard = document.createElement("div");
     objectCard.className = "object-card";
 
@@ -109,42 +147,14 @@ function addObject() {
     const attributesContainer = objectCard.querySelector(".attributesContainer");
 
     addAttributeButton.addEventListener("click", () => {
-        const attributeDiv = document.createElement("div");
-        attributeDiv.className = "attribute";
-        attributeDiv.innerHTML = `
-                    <p>
-                        Attribute Name: <input type="text" name="attributeName[]" required>
-                    </p>
-                    <p>
-                        Attribute Path: <input type="text" class="for-path" name="attributePath[]" required>
-                    </p>
-                    <button type="button" class="btn-main remove-btn removeAttributeButton">Remove Attribute</button>
-                `;
-        const attributePathInput = attributeDiv.querySelector(".for-path");
-        attributePathInput.addEventListener('focus', () => {
-            let forPathElements = document.getElementsByClassName('for-path');
-            for (let i = 0; i < forPathElements.length; i++) {
-                if (forPathElements[i] != attributePathInput) {
-                    forPathElements[i].classList.remove('for-path-selected');
-                }
-            }
-            selectedInput = attributePathInput;
-            attributePathInput.classList.add('for-path-selected');
-        });
-        // Add functionality to remove attributes
-        const removeAttributeButton = attributeDiv.querySelector(".removeAttributeButton");
-        removeAttributeButton.addEventListener("click", () => {
-            attributesContainer.removeChild(attributeDiv);
-        });
-
-        attributesContainer.appendChild(attributeDiv);
+        addParseAttribute(attributesContainer);
     });
 
     objectsContainer.appendChild(objectCard);
 }
 
 // Add functionality to add objects
-addObjectButton.addEventListener("click", addObject);
+addObjectButton.addEventListener("click", addParseObject);
 
 // Validate all fields before form submission
 objectForm.addEventListener("submit", (event) => {
@@ -170,30 +180,23 @@ objectForm.addEventListener("submit", (event) => {
     // If all fields are valid, process the data
     const formData = new FormData(objectForm);
 
-    const data = {};
-
-    data.start_url = '';
-    data.crawler_settings = {
-        request_delay: 2,
-        output_file_format: 'json'
-    }
+    let paginationSettings;
 
     // Add NOTE data if the checkbox is checked
     if (noteCheckbox.checked) {
-        data.crawler_settings.pagination = {
-            enabled: true,
-            next_page_selector: {
-                path: formData.get("noteInfo"),
-                selector_type: 'xpath'
-            },
-            start_page: 0,
-            max_pages: 4,
-            page_increment: 1,
-            url_param_template: formData.get("noteName")
-        };
+        paginationSettings = new PaginationSettings(
+            noteCheckbox.checked,
+            new PathData(formData.get("noteInfo"), 'xpath'),
+            formData.get("noteName"),
+            0,
+            4,
+            1
+        );
     } else {
-        data.crawler_settings.pagination.enabled = false;
+        paginationSettings = new PaginationSettings(false);
     }
+
+    const crawlerSettings = new CrawlerSettings(paginationSettings, 1, 'json');
 
     // Organize the data into objects and attributes
     const objectNames = formData.getAll("objectName[]");
@@ -203,64 +206,53 @@ objectForm.addEventListener("submit", (event) => {
 
     // Group data by objects
     let attributeIndex = 0;
-    data.meta = [];
+
+    const crawlerMeta = [];
     objectNames.forEach((name, index) => {
-        const object = {
-            object_name: name,
-            object_caption: name,
-            object_selector: {
-                path: objectPaths[index],
-                selector_type: 'xpath'
-            },
-            attributes: []
-        };
+        const parseObject = new ObjectMeta(
+            name,
+            name,
+            new PathData(objectPaths[index], 'xpath'),
+            []);
 
         // Find attributes for the current object
         const attributesContainer = objectsContainer.children[index].querySelector(".attributesContainer");
         const attributeDivs = attributesContainer.querySelectorAll(".attribute");
 
         attributeDivs.forEach(() => {
-            object.attributes.push({
-                attribute_name: attributeNames[attributeIndex],
-                attribute_caption: attributeNames[attributeIndex],
-                attribute_selector: {
-                    path: attributePaths[attributeIndex],
-                    selector_type: 'xpath'
-                },
-                attribute_type: 'simple',
-                required: true
-            });
+            parseObject.attributes.push(
+                new Attribute(attributeNames[attributeIndex],
+                    attributeNames[attributeIndex],
+                    new PathData(attributePaths[attributeIndex],
+                        'xpath')))
             attributeIndex++;
         });
 
-        data.meta.push(object);
+        crawlerMeta.push(parseObject);
     });
 
-    sendParsingTask(data);
-    console.log(data);
+    sendParsingTask(crawlerSettings, crawlerMeta);
+    console.log(crawlerSettings, crawlerMeta);
 });
 
-async function sendParsingTask(data) {
-    const apiUrl = 'http://localhost:8000/start_crawler';
-    data.start_url = await chrome.runtime.sendMessage({ action: "getActiveTab" });
-    data.start_url = data.start_url.url || 'No URL data';
-    console.log(data.start_url);
-    let id = undefined;
-    try {
-        const response = await fetch(apiUrl, {
-            method: "POST",
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
-        })
-        if (!response.ok) {
-            throw new Error(`Error HTTP: ${response.status}`);
-        }
-        id = await response.json()
-    } catch (error) {
-        console.error('Error:', error);
-    }
+/**
+ * 
+ * @param {CrawlerSettings} settings 
+ * @param {ObjectMeta[]} meta 
+ * @returns {Object.<string, string>}
+ */
+async function sendParsingTask(settings, meta) {
+    let start_url = await chrome.runtime.sendMessage({ action: "getActiveTab" });
+    start_url = start_url.url || 'No URL data';
 
-    return id;
+    let ans = undefined;
+
+    const crawlerRequest = new CrawlerRequest(
+        start_url,
+        settings,
+        meta
+    );
+
+    ans = await crawlerRequest.sendParsingTask();
+    return ans;
 }
