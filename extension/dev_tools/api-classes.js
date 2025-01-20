@@ -20,7 +20,7 @@ export class Attribute {
      * @param {string} delimeter 
      * @param {Attribute[]} linked_attributes 
      */
-    constructor(name, caption, pathData, delimeter, type = 'simple', linked_attributes = undefined) {
+    constructor(name, caption, pathData, delimeter = undefined, type = 'simple', linked_attributes = undefined) {
         this.attribute_name = name;
         this.attribute_caption = caption;
         this.attribute_selector = pathData;
@@ -73,7 +73,7 @@ export class CrawlerSettings {
      * @param {PaginationSettings} pagination 
      * @param {number} request_delay 
      * @param {string[]} allowed_domains 
-     * @param {{str:str}[]} request_headers 
+     * @param {{str:str}} request_headers 
      */
     constructor(pagination, request_delay, output_file_format = 'json', allowed_domains = undefined, request_headers = undefined) {
         this.request_headers = request_delay;
@@ -81,6 +81,7 @@ export class CrawlerSettings {
         this.output_file_format = output_file_format;
         this.allowed_domains = allowed_domains;
         this.pagination = pagination;
+        this.request_headers = request_headers
     }
 }
 
@@ -89,7 +90,7 @@ export class CrawlerRequest {
      * 
      * @param {string} start_url 
      * @param {CrawlerSettings} crawler_settings 
-     * @param {ObjectMeta} meta 
+     * @param {ObjectMeta[]} meta 
      */
     constructor(start_url, crawler_settings, meta) {
         this.start_url = start_url;
@@ -99,9 +100,36 @@ export class CrawlerRequest {
 
     /**
      * 
-     * @returns {number}
+     * @returns {Promise}
      */
-    async sendRequest() {
-        return id;
+    async sendParsingTask() {
+        const apiUrl = 'http://localhost:8000/start_crawler';
+        let ans = undefined;
+        try {
+            const response = await fetch(apiUrl, {
+                method: "POST",
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    start_url: this.start_url,
+                    crawler_settings: this.crawler_settings,
+                    meta: this.meta
+                })
+            })
+            if (!response.ok) {
+                throw new Error(`Error HTTP: ${response.status}`);
+            }
+            ans = await response.json()
+        } catch (error) {
+            console.error('Error:', error);
+        }
+
+        console.log(JSON.stringify({
+            start_url: this.start_url,
+            crawler_settings: this.crawler_settings,
+            meta: this.meta
+        }));
+        return ans;
     }
 }
