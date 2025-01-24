@@ -1,12 +1,9 @@
 {
     "start_url": "https://www.findbook.ru/search/d1?title=%D1%E8%EC%E2%EE%EB%E8%F7%E5%F1%EA%E8%E5+%E4%E8%F0%E5%EA%F6%E8%E8&r=0&s=1&viewsize=15&startidx=",
     "crawler_settings": {
-        "request_headers": {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-            "Accept-Language": "en-US,en;q=0.9"
-        },
         "request_delay": 2,
         "output_file_format": "csv",
+        "allowed_domains": ["start_url", "other_sites"],
         "pagination": {
             "enabled": true,
             "next_page_selector": {
@@ -55,30 +52,26 @@
                     },
                     "attribute_type": "array",
                     "delimiter": ";"
-                }
-            ]
-        },
-        {
-            "object_name": "offer",
-            "object_caption": "Предложение",
-            "attributes": [
-                {
-                    "attribute_name": "price",
-                    "attribute_caption": "Цена",
-                    "attribute_selector": {
-                        "path": "//span[@class='price']",
-                        "selector_type": "xpath"
-                    },
-                    "attribute_type": "simple"
                 },
                 {
                     "attribute_name": "link",
-                    "attribute_caption": "Ссылка",
+                    "attribute_caption": "Страница объекта",
                     "attribute_selector": {
-                        "path": "//a[@class='offer-link']",
+                        "path": "//b[@class='results__title-name']",
                         "selector_type": "xpath"
                     },
-                    "attribute_type": "simple"
+                    "attribute_type": "link",
+                    "linked_attributes": [
+                        {
+                            "attribute_name": "description",
+                            "attribute_caption": "Описание",
+                            "attribute_selector": {
+                                "path": "//b[@class='results__title-name']",
+                                "selector_type": "xpath"
+                            },
+                            "attribute_type": "simple"
+                        }
+                    ]
                 }
             ]
         }
