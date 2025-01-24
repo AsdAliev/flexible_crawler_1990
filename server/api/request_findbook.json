@@ -5,12 +5,8 @@
         "output_file_format": "csv",
         "pagination": {
             "enabled": true,
-            "next_page_selector": {
-                "path": "//b[contains(@class, 'pagination__page--active')]/following-sibling::a[1]",
-                "selector_type": "xpath"
-            },
             "url_param_template": "startidx={page_number}",
-            "max_pages": 2,
+            "max_pages": 3,
             "page_increment": 15
         }
     },

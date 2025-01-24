@@ -10,11 +10,10 @@ class FlexibleSpider(scrapy.Spider):
     name = "flexible_spider"
 
     # Эти переменные мы будем получать через аргументы командной строки (-a)
-    def __init__(self, config_path, output_path, output_format, *args, **kwargs):
+    def __init__(self, config_path, output_path, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.config_path = config_path
         self.output_path = output_path
-        self.output_format = output_format
 
         # Читаем JSON-настройки из файла
         if self.config_path and os.path.exists(self.config_path):
@@ -23,15 +22,10 @@ class FlexibleSpider(scrapy.Spider):
         self.allowed_domains = self.config.get('crawler_settings', {}).get('allowed_domains', all)
         self.start_page = None
 
-        # Загружаем User-Agent'ы из файла
-        self.user_agent_list = []
-        if os.path.exists(os.path.join(os.path.dirname(__file__), "user_agents.txt")):
-            with open(os.path.join(os.path.dirname(__file__), "user_agents.txt"), "r", encoding="utf-8") as f:
-                self.user_agent_list = [line.strip() for line in f if line.strip()]
-
     def start_requests(self):
         # Берём start_url из конфигурации
         start_url = self.config.get("start_url")
+
         if start_url:
             yield scrapy.Request(
                 url=start_url,

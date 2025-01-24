@@ -5,26 +5,24 @@ import uvicorn
 import subprocess
 import os
 import uuid
+import json
+import csv
+import xml.etree.ElementTree as ET
 from threading import Lock
 from models import CrawlerRequest
 
 app = FastAPI(
     title="Flexible Crawler API",
     description="API для запуска гибкого краулера на базе Scrapy",
-    version="1.1.0"
+    version="1.2.0"
 )
 
-# Папка, где будут сохраняться результаты
+# Создание папок для промежуточных результатов
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), "results")
-
-if not os.path.exists(RESULTS_DIR):
-    os.makedirs(RESULTS_DIR)
-
-# Папка, где будут сохраняться схемы полученные с фронта
 SCHEMAS_DIR = os.path.join(os.path.dirname(__file__), "schemas")
-
-if not os.path.exists(SCHEMAS_DIR):
-    os.makedirs(SCHEMAS_DIR)
+for dir in [RESULTS_DIR, SCHEMAS_DIR]:
+    if not os.path.exists(dir):
+        os.makedirs(dir)
 
 # Словарь для хранения статусов задачи и формата выходного файла
 task_data = {}
@@ -53,12 +51,11 @@ def start_crawler(data: CrawlerRequest, background_tasks: BackgroundTasks):
         f.write(data.model_dump_json())
 
     # Результат будем складывать в файл с таким же Task ID
-    output_format = data.crawler_settings.output_file_format
-    output_path = os.path.join(RESULTS_DIR, f"{task_id}_result.{output_format}")
+    output_path = os.path.join(RESULTS_DIR, f"{task_id}_result.json")
 
     # Обновляем статус задачи
     with status_lock:
-        task_data[task_id] = {"status": "in progress", "format": output_format}
+        task_data[task_id] = {"status": "in progress"}
 
     # Запускаем Scrapy через subprocess, передавая нужные аргументы
     # Обратите внимание, что flexible_spider должен уметь получать task_id и config_path
@@ -69,8 +66,7 @@ def start_crawler(data: CrawlerRequest, background_tasks: BackgroundTasks):
         "crawl",
         "flexible_spider",
         "-a", f"config_path={config_path}",
-        "-a", f"output_path={output_path}",
-        "-a", f"output_format={output_format}"
+        "-a", f"output_path={output_path}"
     ]
 
     # Функция для обновления статуса задачи
@@ -119,7 +115,7 @@ def get_status(task_id: str):
 
 
 @app.get("/result/{task_id}")
-def get_result(task_id: str):
+def get_result(task_id: str, output_format: str):
     """
     Эндпоинт для получения файла результата задачи по Task ID.
     Возвращает файл в заданном формате, либо сообщение об ошибке в формате JSON.
@@ -149,11 +145,10 @@ def get_result(task_id: str):
         )
 
     # Путь к результату
-    output_format = current_data["format"]
-    output_path = os.path.join(RESULTS_DIR, f"{task_id}_result.{output_format}")
+    result_path = os.path.join(RESULTS_DIR, f"{task_id}_result.json")
 
     # Проверяем существование файла
-    if not os.path.exists(output_path):
+    if not os.path.exists(result_path):
         return JSONResponse(
             content={
                 "task_id": task_id,
@@ -161,17 +156,60 @@ def get_result(task_id: str):
             },
             status_code=404
         )
+    
+    output_path = result_path.replace('.json', f'.{output_format}')
+    
+    if output_format == 'json':
+        return FileResponse(
+            path=output_path,
+            filename=f"{task_id}_result.json",
+            media_type="application/octet-stream"
+        )
+    
+    with open(result_path, "r", encoding="utf-8") as f:
+        items = json.load(f)
+ 
+    if output_format == "csv":
+        with open(output_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=items[0].keys())
+            writer.writeheader()
+            writer.writerows(items)
+        
+        return FileResponse(
+            path=output_path,
+            filename=f"{task_id}_result.csv",
+            media_type="application/octet-stream"
+        )
+    
+    if output_format == "xml":
+        root = ET.Element("items")
+        for item in items:
+            item_element = ET.SubElement(root, "item")
+            for key, value in item.items():
+                child = ET.SubElement(item_element, key)
+                child.text = str(value)
+        tree = ET.ElementTree(root)
+        tree.write(output_path, encoding="utf-8", xml_declaration=True)
 
-    # Возвращаем файл, если он существует
-    return FileResponse(
-        path=output_path,
-        filename=f"{task_id}_result.{output_format}",
-        media_type="application/octet-stream"
-    )
+        return FileResponse(
+            path=output_path,
+            filename=f"{task_id}_result.xml",
+            media_type="application/octet-stream"
+        )
+
+    return JSONResponse(
+            content={
+                "task_id": task_id,
+                "description": "Неподдерживаемый формат файла"
+            },
+            status_code=422
+        )
+
 
 
 @app.delete("/delete/{task_id}")
 def delete_files(task_id: str):
+
     """
     Эндпоинт для удаления промежуточной схемы и результата задачи по Task ID.
     Возвращает JSON с результатом: какие файлы были удалены и статус задачи.
