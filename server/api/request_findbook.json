@@ -2,7 +2,6 @@
     "start_url": "https://www.findbook.ru/search/d1?title=451+градус+по+фаренгейту&r=0&s=1&viewsize=15&startidx=15",
     "crawler_settings": {
         "request_delay": 2,
-        "output_file_format": "csv",
         "pagination": {
             "enabled": true,
             "url_param_template": "startidx={page_number}",

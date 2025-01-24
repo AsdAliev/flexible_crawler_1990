@@ -2,7 +2,6 @@
     "start_url": "https://www.findbook.ru/search/d1?title=%D1%E8%EC%E2%EE%EB%E8%F7%E5%F1%EA%E8%E5+%E4%E8%F0%E5%EA%F6%E8%E8&r=0&s=1&viewsize=15&startidx=",
     "crawler_settings": {
         "request_delay": 2,
-        "output_file_format": "csv",
         "allowed_domains": ["start_url", "other_sites"],
         "pagination": {
             "enabled": true,

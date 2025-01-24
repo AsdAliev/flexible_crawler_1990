@@ -62,7 +62,6 @@ class PaginationSettings(BaseModel):
 class CrawlerSettings(BaseModel):
     request_headers: Optional[Dict[str, str]] = Field(None, description="Заголовки для HTTP-запросов")  # обсудить
     request_delay: Optional[int] = Field(1, description="Задержка между запросами (в секундах)")
-    output_file_format: Literal["json", "csv", "xml"] = Field(..., description="Формат результирующего файла")
     allowed_domains: Optional[List[str]] = Field(None, description="Домены, разрешенные для краулинга")
     pagination: PaginationSettings = Field(..., description="Настройки пагинации")
 
