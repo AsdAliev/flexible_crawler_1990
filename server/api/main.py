@@ -6,8 +6,7 @@ import subprocess
 import os
 import uuid
 from threading import Lock
-from validation import CrawlerRequest
-
+from models import CrawlerRequest
 
 app = FastAPI(
     title="Flexible Crawler API",
@@ -31,13 +30,14 @@ if not os.path.exists(SCHEMAS_DIR):
 task_data = {}
 status_lock = Lock()
 
+
 @app.get("/")
 def read_root():
     return {"message": "Flexible Crawler API is running"}
 
 
 @app.post("/start_crawler")
-def start_crawler(data: dict, background_tasks: BackgroundTasks):
+def start_crawler(data: CrawlerRequest, background_tasks: BackgroundTasks):
     """
     Эндпоинт для запуска краулера.
     Принимает JSON с параметрами парсинга (start_url, crawler_settings, meta).
@@ -46,26 +46,14 @@ def start_crawler(data: dict, background_tasks: BackgroundTasks):
     # Генерируем уникальный ID задачи
     task_id = str(uuid.uuid4())
 
-    # Валидация входящих данных
-    try:
-        validated_data = CrawlerRequest(**data)
-    except ValidationError as e:
-        return JSONResponse(
-            content={
-                "task_id": task_id,
-                "details": e.errors()
-            },
-            status_code=422 #ошибка валидации
-        )
-
     # Сохраняем полученный JSON во временный файл (или в базу) —
     # затем паук сможет прочитать этот файл, чтобы знать, что именно парсить.
     config_path = os.path.join(SCHEMAS_DIR, f"{task_id}_config.json")
     with open(config_path, "w", encoding="utf-8") as f:
-        f.write(validated_data.model_dump_json())
+        f.write(data.model_dump_json())
 
     # Результат будем складывать в файл с таким же Task ID
-    output_format = validated_data.crawler_settings.output_file_format
+    output_format = data.crawler_settings.output_file_format
     output_path = os.path.join(RESULTS_DIR, f"{task_id}_result.{output_format}")
 
     # Обновляем статус задачи
@@ -110,9 +98,9 @@ def get_status(task_id: str):
     Возвращает статус: in_progress, completed, или not_found.
     """
     with status_lock:
-        current_data = task_data.get(task_id, None)
+        current_data = task_data.get(task_id, {})
 
-    if current_data is None:
+    if not current_data:
         return JSONResponse(
             content={
                 "task_id": task_id,
@@ -130,7 +118,6 @@ def get_status(task_id: str):
     )
 
 
-
 @app.get("/result/{task_id}")
 def get_result(task_id: str):
     """
@@ -138,7 +125,7 @@ def get_result(task_id: str):
     Возвращает файл в заданном формате, либо сообщение об ошибке в формате JSON.
     """
     with status_lock:
-        current_data = task_data.get(task_id, None)
+        current_data = task_data.get(task_id, {})
 
     # Проверяем наличие задачи
     if not current_data:
@@ -183,7 +170,6 @@ def get_result(task_id: str):
     )
 
 
-
 @app.delete("/delete/{task_id}")
 def delete_files(task_id: str):
     """
@@ -191,7 +177,7 @@ def delete_files(task_id: str):
     Возвращает JSON с результатом: какие файлы были удалены и статус задачи.
     """
     with status_lock:
-        current_data = task_data.get(task_id, None)
+        current_data = task_data.get(task_id, {})
 
     if not current_data:
         return JSONResponse(
@@ -223,14 +209,13 @@ def delete_files(task_id: str):
             "status": "deleted",
             "deleted_files": files_deleted,
             "message": (
-                "Файлы и данные были успещно удалены" 
-                if files_deleted else 
+                "Файлы и данные были успещно удалены"
+                if files_deleted else
                 "Файлов нет, но остальные данные были удалены"
             )
         },
         status_code=200
     )
-
 
 
 if __name__ == "__main__":

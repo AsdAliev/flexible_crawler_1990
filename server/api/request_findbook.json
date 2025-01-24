@@ -1,5 +1,5 @@
 {
-    "start_url": "https://www.findbook.ru/search/d1?title=451+градус+по+фаренгейту&r=0&s=1&viewsize=15&startidx=0",
+    "start_url": "https://www.findbook.ru/search/d1?title=451+градус+по+фаренгейту&r=0&s=1&viewsize=15&startidx=15",
     "crawler_settings": {
         "request_delay": 2,
         "output_file_format": "csv",
@@ -9,9 +9,9 @@
                 "path": "//b[contains(@class, 'pagination__page--active')]/following-sibling::a[1]",
                 "selector_type": "xpath"
             },
-            "start_page": 0,
-            "max_pages": 4,
-            "page_increment": 1
+            "url_param_template": "startidx={page_number}",
+            "max_pages": 2,
+            "page_increment": 15
         }
     },
     "meta": [

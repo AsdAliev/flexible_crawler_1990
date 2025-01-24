@@ -1,12 +1,9 @@
-import json
-import scrapy
 import os
-import random
+import json
 
-def get_element_by_selector(response, path, type):
-    if type == 'xpath':
-        return response.xpath(path)
-    return response.css(path)
+import scrapy
+
+from .utils import get_element_by_selector, extract_current_page_from_url
 
 
 class FlexibleSpider(scrapy.Spider):
@@ -24,6 +21,7 @@ class FlexibleSpider(scrapy.Spider):
             with open(self.config_path, "r", encoding="utf-8") as f:
                 self.config = json.load(f)
         self.allowed_domains = self.config.get('crawler_settings', {}).get('allowed_domains', all)
+        self.start_page = None
 
         # Загружаем User-Agent'ы из файла
         self.user_agent_list = []
@@ -49,8 +47,8 @@ class FlexibleSpider(scrapy.Spider):
         # 1. Разбираем поле meta и извлекаем данные
         meta_objects = self.config.get("meta", [])
 
-        for object in meta_objects:
-            object_selector_info = object.get("object_selector", {})
+        for obj in meta_objects:
+            object_selector_info = obj.get("object_selector", {})
             object_path = object_selector_info.get("path", "")
             object_selector_type = object_selector_info.get("selector_type", "xpath")
 
@@ -65,7 +63,7 @@ class FlexibleSpider(scrapy.Spider):
                 links_to_follow = []  # Список ссылок для последующей обработки
 
                 # Парсим атрибуты
-                for attr in object.get("attributes", []):
+                for attr in obj.get("attributes", []):
                     attribute_caption = attr.get("attribute_caption")
 
                     attr_selector_info = attr.get("attribute_selector", {})
@@ -112,54 +110,59 @@ class FlexibleSpider(scrapy.Spider):
         # 2. Логика пагинации
         pagination_settings = self.config.get("crawler_settings", {}).get("pagination", {})
         if pagination_settings.get("enabled"):
-            next_page_selector_info = pagination_settings.get("next_page_selector", {})
-            next_page_path = next_page_selector_info.get("path", "")
-            next_page_selector_type = next_page_selector_info.get("selector_type", "xpath")
-
+            url_param_template = pagination_settings.get("url_param_template", None)
+            next_page_selector_info = pagination_settings.get("next_page_selector", None)
             max_pages = pagination_settings.get("max_pages", 1)
-            page_increment = pagination_settings.get("page_increment", 1)
 
-            # Можно подсчитать текущую страницу из URL или хранить счётчик в meta
-            current_page = response.meta.get("page_number", pagination_settings.get("start_page", 0))
-            if current_page < max_pages:
-                # Когда вручную прописывается параметр url для пагинации
-                if pagination_settings.get("url_param_template"):
-                    # Например, startidx={page_number}
-                    next_page_number = current_page + page_increment
-                    url_template = self.config["start_url"]
-                    url_param_template = pagination_settings["url_param_template"]
+            if url_param_template and next_page_selector_info:
+                pass  # Сообщение "Используйте ровно один способ обхода"
 
-                    # Допустим, меняем startidx=0 на startidx=15 и т.п.
-                    next_url = url_template.replace(
+            if url_param_template:
+                curr_url = response.url
+                current_page = extract_current_page_from_url(curr_url, url_param_template)
+                if current_page is None:
+                    pass  # Сообщение "Неверный url_param_template"
+
+                if self.start_page is None:
+                    self.start_page = current_page
+
+                page_increment = pagination_settings.get("page_increment", 1)
+                next_page_number = current_page + page_increment
+
+                if current_page < self.start_page + (max_pages - 1) * page_increment:
+                    next_url = curr_url.replace(
                         url_param_template.format(page_number=current_page),
                         url_param_template.format(page_number=next_page_number)
                     )
-                    
-                    print('***************************************************************************')
-                    print(next_url)
-                    print('***************************************************************************')
 
-                    yield scrapy.Request(
+                    yield response.follow(
                         url=next_url,
-                        callback=self.parse,
-                        meta={"page_number": next_page_number}
+                        callback=self.parse
                     )
-                elif next_page_selector_info:
-                    # Когда указывается XPath/CSS селектор "кнопки" Следующая страница
+
+            # Когда указывается XPath/CSS селектор "кнопки" Следующая страница
+            elif next_page_selector_info:
+                current_page = response.meta.get("page_number", 1)
+                if current_page < max_pages:
+                    next_page_path = next_page_selector_info.get("path", "")
+                    next_page_selector_type = next_page_selector_info.get("selector_type", "xpath")
+
+                    # Ищем элемент ссылки
                     next_page_el = get_element_by_selector(response, next_page_path, next_page_selector_type)
 
-                    next_page_link = next_page_el.attrib.get("href")
-                    if next_page_link:
-                        yield response.follow(
-                            next_page_link,
-                            callback=self.parse,
-                            meta={"page_number": current_page + page_increment}
-                        )
+                    if next_page_el:
+                        next_page_link = next_page_el.attrib.get("href")
+                        if next_page_link:
+                            yield response.follow(
+                                next_page_link,
+                                callback=self.parse,
+                                meta={"page_number": current_page + 1}
+                            )
 
     def parse_links(self, response):
         """
         Парсинг данных из linked_attributes для ссылки.
-        В response meta лежит 
+        В response meta лежит
         * список аттрибутов, которые будем брать с нового сайта,
         * уже собранная информация про объект
         * количество ссылок, чтобы не повторяться в результатах
@@ -186,4 +189,3 @@ class FlexibleSpider(scrapy.Spider):
         else:
             # Передаём обновлённое количество оставшихся ссылок
             response.meta["remaining_links"] = remaining_links
-

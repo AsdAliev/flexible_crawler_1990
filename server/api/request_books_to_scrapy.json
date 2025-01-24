@@ -1,5 +1,5 @@
 {
-    "start_url": "https://books.toscrape.com/catalogue/page-1.html",
+    "start_url": "https://books.toscrape.com/catalogue/page-4.html",
     "crawler_settings": {
         "request_delay": 2,
         "output_file_format": "json",
@@ -10,10 +10,7 @@
                 "path": "//li[@class='next']/a",
                 "selector_type": "xpath"
             },
-            "url_param_template": "page-{page_number}.html",
-            "start_page": 1,
-            "max_pages": 50,
-            "page_increment": 1
+            "max_pages": 10
         }
     },
     "meta": [
