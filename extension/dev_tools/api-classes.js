@@ -69,16 +69,14 @@ export class PaginationSettings {
 export class CrawlerSettings {
     /**
      * 
-     * @param {'csv' | 'json' | 'xlsx'} output_file_format 
      * @param {PaginationSettings} pagination 
      * @param {number} request_delay 
      * @param {string[]} allowed_domains 
      * @param {{str:str}} request_headers 
      */
-    constructor(pagination, request_delay, output_file_format = 'json', allowed_domains = undefined, request_headers = undefined) {
+    constructor(pagination, request_delay, allowed_domains = undefined, request_headers = undefined) {
         this.request_headers = request_delay;
         this.request_delay = request_delay;
-        this.output_file_format = output_file_format;
         this.allowed_domains = allowed_domains;
         this.pagination = pagination;
         this.request_headers = request_headers

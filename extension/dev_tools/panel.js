@@ -4,255 +4,160 @@ import {
     PaginationSettings, CrawlerSettings, CrawlerRequest
 } from "./api-classes.js";
 
-const objectsContainer = document.getElementById("objectsContainer");
-const addObjectButton = document.getElementById("addObjectButton");
-const objectForm = document.getElementById("objectForm");
-const noteCheckbox = document.getElementById("noteCheckbox");
-const noteSection = document.getElementById("noteSection");
-const noteName = document.getElementById("noteName");
-const noteInfo = document.getElementById("noteInfo");
-/**
- * input, в который будет вписан путь (xpath, css)
- */
-let selectedInput = undefined;
-
-// Listen for element selection changes
+// add listener to get path for parse elements
 chrome.devtools.panels.elements.onSelectionChanged.addListener(() => {
-    // Evaluate the functions to get the CSS Selector and XPath of the currently inspected element
     chrome.devtools.inspectedWindow.eval(
         `(${getCssSelector.toString()})(inspect($0))`,
         (cssResult, isCssException) => {
             if (isCssException) {
-                document.getElementById("css-selector").textContent =
-                    "Error: Unable to compute the CSS Selector.";
+                console.error("Error: Unable to compute the CSS Selector.");
             } else {
-                document.getElementById("css-selector").textContent = cssResult;
-            }
-        }
-    );
-
-    chrome.devtools.inspectedWindow.eval(
-        `(${getXPath.toString()})(inspect($0))`,
-        (xpathResult, isXPathException) => {
-            if (isXPathException) {
-                document.getElementById("xpath").textContent =
-                    "Error: Unable to compute the XPath.";
-            } else {
-                document.getElementById("xpath").textContent = xpathResult;
-                if (selectedInput) {
-                    selectedInput.value = xpathResult;
-                }
+                console.log(cssResult);
             }
         }
     );
 });
 
+const parseForm = document.getElementById('parse-form');
+const FormHelper = {
+    objectCounter: 0,
+    attributeCounter: 0,
+    /**
+     * 
+     * @param {HTMLElement} form 
+     * @returns {HTMLElement}
+     */
+    createObject: (form) => {
+        const object = document.createElement('div');
+        object.classList.add('parse-object');
+        object.id = `parse_object${FormHelper.objectCounter++}`;
+        //values
+        const nameContainer = document.createElement('div');
+        nameContainer.classList.add('object-info');
 
+        const span = document.createElement('span');
+        span.textContent = "Object name:"
+        const name = document.createElement('input');
+        name.name = object.id + '.name'
+        nameContainer.appendChild(span);
+        nameContainer.appendChild(name);
 
-noteInfo.addEventListener('focus', () => {
-    let forPathElements = document.getElementsByClassName('for-path');
-    for (let i = 0; i < forPathElements.length; i++) {
-        if (forPathElements[i] != noteInfo) {
-            forPathElements[i].classList.remove('for-path-selected');
-        }
+        const path = FormHelper.createPathInput(object.id);
+        object.appendChild(nameContainer)
+        object.appendChild(path)
+
+        //create attribute btn
+        const createAttrBtn = document.createElement('button')
+        createAttrBtn.textContent = 'Add attribute';
+        object.appendChild(createAttrBtn);
+        createAttrBtn.type = 'button';
+        createAttrBtn.onclick = () => object.insertBefore(FormHelper.createAttribute(object.id),
+            createAttrBtn);
+
+        //rm button
+        const rmbtn = document.createElement('button');
+        rmbtn.onclick = () => form.removeChild(object);
+        rmbtn.textContent = 'Remove object';
+        rmbtn.type = 'button';
+        object.appendChild(rmbtn);
+
+        return object;
+    },
+    createPathInput: (parentId) => {
+        const parent = document.getElementById(parentId)
+        const path = document.createElement('div');
+        path.innerHTML = `
+            <div>
+                <span>Path type:</span>
+                <select name=${parentId + '.path_type'}>
+                    <option selected>xpath</option>
+                    <option>css</option>
+                </select>
+            </div>
+            <div> 
+                <span>Path:</span>
+                <input type="text" name=${parentId + '.path'}>
+            </div> 
+        `;
+        return path;
+    },
+    createAttribute: (parentId) => {
+        const attribute = document.createElement('div');
+        attribute.classList.add('parse-attribute');
+        attribute.id = parentId + `.attribute${FormHelper.attributeCounter++}`;
+
+        //values
+        const nameContainer = document.createElement('div');
+        nameContainer.classList.add('object-info');
+
+        const span = document.createElement('span');
+        span.textContent = "Attribute name:"
+        const name = document.createElement('input');
+        name.name = attribute.id + '.name'
+        nameContainer.appendChild(span);
+        nameContainer.appendChild(name);
+
+        const path = FormHelper.createPathInput(attribute.id);
+        attribute.appendChild(nameContainer)
+        attribute.appendChild(path)
+        //create attribute btn
+        const createAttrBtn = document.createElement('button')
+        createAttrBtn.textContent = 'Add attribute';
+        createAttrBtn.type = 'button';
+        attribute.appendChild(createAttrBtn);
+        createAttrBtn.onclick = () => attribute.insertBefore(FormHelper.createAttribute(attribute.id),
+            createAttrBtn);
+
+        //rm button
+        const rmbtn = document.createElement('button');
+        rmbtn.onclick = () => document.getElementById(parentId).removeChild(attribute);
+        rmbtn.textContent = 'Remove attribute';
+        rmbtn.type = 'button';
+        attribute.appendChild(rmbtn);
+
+        return attribute;
     }
-    selectedInput = noteInfo;
-    noteInfo.classList.add('for-path-selected');
-});
-
-// Show/hide NOTE section based on checkbox state
-noteCheckbox.addEventListener("change", () => {
-    noteSection.classList.toggle("hidden", !noteCheckbox.checked);
-    if (!noteCheckbox.checked) {
-        noteName.value = "";
-        noteInfo.value = "";
-    }
-});
-
-/**
- * 
- * @param {HTMLElement} attributesContainer 
- */
-function addParseAttribute(attributesContainer) {
-    const attributeDiv = document.createElement("div");
-    attributeDiv.className = "attribute";
-    attributeDiv.innerHTML = `
-                    <p>
-                        Attribute Name: <input type="text" name="attributeName[]" required>
-                    </p>
-                    <p>
-                        Attribute Path: <input type="text" class="for-path" name="attributePath[]" required>
-                    </p>
-                    <button type="button" class="btn-main remove-btn removeAttributeButton">Remove Attribute</button>
-                `;
-    const attributePathInput = attributeDiv.querySelector(".for-path");
-    attributePathInput.addEventListener('focus', () => {
-        let forPathElements = document.getElementsByClassName('for-path');
-        for (let i = 0; i < forPathElements.length; i++) {
-            if (forPathElements[i] != attributePathInput) {
-                forPathElements[i].classList.remove('for-path-selected');
-            }
-        }
-        selectedInput = attributePathInput;
-        attributePathInput.classList.add('for-path-selected');
-    });
-    // Add functionality to remove attributes
-    const removeAttributeButton = attributeDiv.querySelector(".removeAttributeButton");
-    removeAttributeButton.addEventListener("click", () => {
-        attributesContainer.removeChild(attributeDiv);
-    });
-
-    attributesContainer.appendChild(attributeDiv);
 }
 
-/**
- * Function to add a new object
- */
-function addParseObject() {
-    const objectCard = document.createElement("div");
-    objectCard.className = "object-card";
+setupParsePage(parseForm);
 
-    objectCard.innerHTML = `
-                <button type="button" class="btn-main remove-btn removeObjectButton">Remove Object</button>
-                <p>
-                    Object Name: <input type="text" name="objectName[]" required>
-                </p>
-                <p>
-                    Object Path: <input type="text" class="for-path" name="objectPath[]" required>
-                </p>
-                <div class="attributesContainer"></div>
-                <button type="button" class="btn-main addAttributeButton">+ Add Attribute</button>
-            `;
-
-    const objectPathInput = objectCard.querySelector(".for-path");
-    objectPathInput.addEventListener('focus', () => {
-        let forPathElements = document.getElementsByClassName('for-path');
-        for (let i = 0; i < forPathElements.length; i++) {
-            if (forPathElements[i] != objectPathInput) {
-                forPathElements[i].classList.remove('for-path-selected');
-            }
-        }
-        selectedInput = objectPathInput;
-        objectPathInput.classList.add('for-path-selected');
-    });
-
-    // Add functionality to remove object
-    const removeObjectButton = objectCard.querySelector(".removeObjectButton");
-    removeObjectButton.addEventListener("click", () => {
-        objectsContainer.removeChild(objectCard);
-    });
-
-    // Add functionality to add attributes
-    const addAttributeButton = objectCard.querySelector(".addAttributeButton");
-    const attributesContainer = objectCard.querySelector(".attributesContainer");
-
-    addAttributeButton.addEventListener("click", () => {
-        addParseAttribute(attributesContainer);
-    });
-
-    objectsContainer.appendChild(objectCard);
+function setupParsePage(parseForm) {
+    setupParseSettings();
+    setupParseForm(parseForm);
 }
 
-// Add functionality to add objects
-addObjectButton.addEventListener("click", addParseObject);
-
-// Validate all fields before form submission
-objectForm.addEventListener("submit", (event) => {
-    event.preventDefault(); // Prevent the default form submission
-    let isValid = true;
-    const inputs = objectForm.querySelectorAll("form-input");
-
-    // Check if all fields are filled
-    inputs.forEach(input => {
-        if (!input.value.trim() && !input.closest(".hidden")) {
-            input.classList.add("invalid");
-            isValid = false;
+function setupParseSettings() {
+    const enablePagination = document.getElementById('enable-pagination');
+    enablePagination.addEventListener('change', () => {
+        if (enablePagination.checked) {
+            document.getElementById('pagination-settings').style.display = 'block';
         } else {
-            input.classList.remove("invalid");
+            document.getElementById('pagination-settings').style.display = 'none';
         }
     });
 
-    if (!isValid) {
-        alert("Please fill in all required fields.");
-        return;
-    }
-
-    // If all fields are valid, process the data
-    const formData = new FormData(objectForm);
-
-    let paginationSettings;
-
-    // Add NOTE data if the checkbox is checked
-    if (noteCheckbox.checked) {
-        paginationSettings = new PaginationSettings(
-            noteCheckbox.checked,
-            new PathData(formData.get("noteInfo"), 'xpath'),
-            formData.get("noteName"),
-            0,
-            4,
-            1
-        );
-    } else {
-        paginationSettings = new PaginationSettings(false);
-    }
-
-    const crawlerSettings = new CrawlerSettings(paginationSettings, 1, 'json');
-
-    // Organize the data into objects and attributes
-    const objectNames = formData.getAll("objectName[]");
-    const objectPaths = formData.getAll("objectPath[]");
-    const attributeNames = formData.getAll("attributeName[]");
-    const attributePaths = formData.getAll("attributePath[]");
-
-    // Group data by objects
-    let attributeIndex = 0;
-
-    const crawlerMeta = [];
-    objectNames.forEach((name, index) => {
-        const parseObject = new ObjectMeta(
-            name,
-            name,
-            new PathData(objectPaths[index], 'xpath'),
-            []);
-
-        // Find attributes for the current object
-        const attributesContainer = objectsContainer.children[index].querySelector(".attributesContainer");
-        const attributeDivs = attributesContainer.querySelectorAll(".attribute");
-
-        attributeDivs.forEach(() => {
-            parseObject.attributes.push(
-                new Attribute(attributeNames[attributeIndex],
-                    attributeNames[attributeIndex],
-                    new PathData(attributePaths[attributeIndex],
-                        'xpath')))
-            attributeIndex++;
-        });
-
-        crawlerMeta.push(parseObject);
+    const paginationType = document.getElementById('pagination-type');
+    paginationType.addEventListener('change', () => {
+        if (paginationType.value == 'Next element') {
+            document.getElementById('next-pagination-elem').style.display = 'block';
+            document.getElementById('pagination-query-param').style.display = 'none';
+        } else if (paginationType.value == 'URL param') {
+            document.getElementById('next-pagination-elem').style.display = 'none';
+            document.getElementById('pagination-query-param').style.display = 'block';
+        }
     });
-
-    sendParsingTask(crawlerSettings, crawlerMeta);
-    console.log(crawlerSettings, crawlerMeta);
-});
+}
 
 /**
  * 
- * @param {CrawlerSettings} settings 
- * @param {ObjectMeta[]} meta 
- * @returns {Object.<string, string>}
+ * @param {HTMLElement} parseForm 
  */
-async function sendParsingTask(settings, meta) {
-    let start_url = await chrome.runtime.sendMessage({ action: "getActiveTab" });
-    start_url = start_url.url || 'No URL data';
-
-    let ans = undefined;
-
-    const crawlerRequest = new CrawlerRequest(
-        start_url,
-        settings,
-        meta
-    );
-
-    ans = await crawlerRequest.sendParsingTask();
-    return ans;
+function setupParseForm(parseForm) {
+    // create button to add object
+    const createObjBtn = document.createElement('button');
+    createObjBtn.onclick = () => parseForm.insertBefore(FormHelper.createObject(parseForm),
+        document.getElementById('form-submit'));
+    createObjBtn.textContent = 'Add object';
+    createObjBtn.type = 'button';
+    parseForm.appendChild(createObjBtn);
 }

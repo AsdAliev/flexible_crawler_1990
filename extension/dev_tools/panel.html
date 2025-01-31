@@ -7,32 +7,43 @@
 </head>
 
 <body>
-    <h2>CSS Selector</h2>
-    <div id="css-selector">Select an element to see its CSS Selector...</div>
-
-    <h2>XPath</h2>
-    <div id="xpath">Select an element to see its XPath...</div>
-    <form id="objectForm">
-        <!-- NOTE Section -->
+    <h1>Form creation</h1>
+    <div id="parse-settings">
         <div>
-            <p>
-                <input type="checkbox" id="noteCheckbox"> Pagination
-            </p>
+            <input type="checkbox" id="enable-pagination">
+            <span>Pagination</span>
         </div>
-        <div id="noteSection" class="hidden">
-            <p>
-                Query param: <input type="text" id="noteName" name="noteName">
-            </p>
-            <p>
-                Iteration element: <input type="text" id="noteInfo" class="for-path" name="noteInfo">
-            </p>
+        <div id="pagination-settings" style="display: none;">
+            <div>
+                <span>Pagination type:</span>
+                <select id="pagination-type">
+                    <option selected>Next element</option>
+                    <option>URL param</option>
+                </select>
+            </div>
+
+            <div id="next-pagination-elem">
+                <div>
+                    <span>Path type:</span>
+                    <select>
+                        <option selected>xpath</option>
+                        <option>css</option>
+                    </select>
+                </div>
+                <div>
+                    <span>Path:</span>
+                    <input type="text">
+                </div>
+            </div>
+            <div id="pagination-query-param" style="display: none;">
+                <span>Query param:</span>
+                <input type="text">
+            </div>
         </div>
+    </div>
 
-        <hr>
-
-        <div id="objectsContainer"></div>
-        <button type="button" class="btn-main" id="addObjectButton">+ Add Object</button>
-        <button type="submit" class="btn-main">Submit</button>
+    <form action="" id="parse-form">
+        <button id="form-submit" type="submit" for="parse-form">Submit</button>
     </form>
     <script src="panel.js" type="module"></script>
 </body>
