@@ -121,6 +121,13 @@ const FormHelper = {
 
 setupParsePage(parseForm);
 
+parseForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const start_url = undefined | 'no url'; // TODO
+    const objectMeta = getRequestMeta();
+    const parse_settings = getParseSettings();
+})
+
 function setupParsePage(parseForm) {
     setupParseSettings();
     setupParseForm(parseForm);
@@ -160,4 +167,14 @@ function setupParseForm(parseForm) {
     createObjBtn.textContent = 'Add object';
     createObjBtn.type = 'button';
     parseForm.appendChild(createObjBtn);
+}
+
+function getParseSettings() {
+
+}
+
+function getRequestMeta() {
+    const form = new FormData(parseForm);
+    const data = Object.fromEntries(form.entries());
+    console.log(data);
 }
