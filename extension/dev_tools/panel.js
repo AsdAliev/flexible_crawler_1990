@@ -173,7 +173,7 @@ async function sendParseRequest() {
     const parse_settings = getParseSettings();
     const req = new CrawlerRequest(start_url, parse_settings, objectMeta);
     console.log(req.toJSON());
-    //req.sendParsingTask();
+    req.sendParsingTask();
 }
 
 function setupParseSettings() {
@@ -226,18 +226,166 @@ function getPaginationSettings() {
         return new PaginationSettings(true,
             new PathData(document.getElementById('next-pagination-elem-path').value.trim(),
                 document.getElementById('pagination-path-type').value.trim()),
-            undefined, 10
+            undefined,
+            document.getElementById('pagination-max-number-of-pages').value.trim()
         );
     } else {
         return new PaginationSettings(true, undefined,
-            document.getElementById('pagination-query-param-input').value().trim(), 10, 1);
+            document.getElementById('pagination-query-param-input').value.trim(),
+            document.getElementById('pagination-max-number-of-pages').value.trim(),
+            document.getElementById('pagination-query-param-increment').value.trim());
     }
 }
 
 function getRequestMeta() {
     const form = new FormData(parseForm);
     const data = Object.fromEntries(form.entries());
-    console.log(data);
-
-    return data;
+    const result = recompileFormData(data);
+    return result;
 }
+
+/**
+ * Recompile form data into an array of ObjectMeta instances.
+ *
+ * @param {object} formData - The input form data using dot notation keys.
+ * @returns {ObjectMeta[]} - Array of ObjectMeta objects.
+ */
+function recompileFormData(formData) {
+    // Build a nested structure for each object.
+    const objects = {};
+
+    // Helper to set a nested property given an array of keys.
+    function setNestedValue(target, keys, value) {
+        const key = keys[0];
+        if (keys.length === 1) {
+            target[key] = value;
+            return;
+        }
+        if (!(key in target)) {
+            target[key] = {};
+        }
+        setNestedValue(target[key], keys.slice(1), value);
+    }
+
+    // Process each key in the form data.
+    for (const fullKey in formData) {
+        const value = formData[fullKey];
+        const parts = fullKey.split('.');
+        // The first part must be like "parse_object0"
+        if (!parts[0].startsWith('parse_object')) {
+            continue;
+        }
+        const objectKey = parts[0]; // e.g. "parse_object0"
+        if (!objects[objectKey]) {
+            // Initialize the object container with attributes.
+            objects[objectKey] = { attributes: {} };
+        }
+        // If there are only two parts, the property is on the object itself.
+        if (parts.length === 2) {
+            objects[objectKey][parts[1]] = value;
+        } else if (parts.length >= 3) {
+            // Otherwise the property belongs to an attribute tree.
+            // For instance, parts like ["attribute0", "name"] or ["attribute1", "attribute2", "path"].
+            const attrPath = parts.slice(1);
+            setNestedValue(objects[objectKey].attributes, attrPath, value);
+        }
+    }
+
+    // Helper function to recursively convert a nested attribute tree into Attribute instances.
+    function convertAttributes(attrTree) {
+        const attributes = [];
+        // Each key is expected to be like "attribute0", "attribute1", etc.
+        for (const attrKey in attrTree) {
+            const attrData = attrTree[attrKey];
+            // Create a PathData instance for this attribute's selector.
+            const pathData = new PathData(
+                attrData.path || "",
+                attrData.path_type || "xpath"
+            );
+
+            // Process nested linked attributes.
+            const linked = [];
+            // Loop over the keys in attrData to see if there are nested attribute objects.
+            for (const key in attrData) {
+                // Skip keys that are standard for an attribute.
+                if (["name", "path_type", "path", "typeof_attr", "delimiter"].includes(key)) {
+                    continue;
+                }
+                // If the key starts with "attribute" and the value is an object, assume it's a nested attribute.
+                if (key.startsWith("attribute") && typeof attrData[key] === "object") {
+                    // The nested object might itself contain multiple attributes, so we convert it.
+                    const nestedAttributes = convertAttributes({ [key]: attrData[key] });
+                    linked.push(...nestedAttributes);
+                }
+            }
+
+            // Create an Attribute instance.
+            // Here we use the "name" property from the form for both the unique name and caption.
+            // You can modify this logic if needed.
+            const attribute = new Attribute(
+                attrData.name,
+                attrData.name,
+                pathData,
+                attrData.typeof_attr || "simple",
+                linked.length > 0 ? linked : undefined,
+                attrData.delimiter
+            );
+            attributes.push(attribute);
+        }
+        return attributes;
+    }
+
+    // Convert our objects container into an array of ObjectMeta instances.
+    const result = [];
+    for (const objectKey in objects) {
+        const obj = objects[objectKey];
+        // Create a PathData instance for the object selector.
+        const objPath = obj.path || "";
+        const objSelectorType = obj.path_type || "xpath";
+        const objectPathData = new PathData(objPath, objSelectorType);
+
+        // Convert attributes for this object.
+        const attributes = convertAttributes(obj.attributes);
+
+        // Create the ObjectMeta instance.
+        // We use the "name" property from the form for both the unique name and caption.
+        const objectMeta = new ObjectMeta(
+            obj.name,
+            obj.name,
+            objectPathData,
+            attributes
+        );
+        result.push(objectMeta);
+    }
+
+    return result;
+}
+
+// // test usage:
+// const TEST_FOR_formData = {
+//     "parse_object0.name": "obl1",
+//     "parse_object0.path_type": "xpath",
+//     "parse_object0.path": "123",
+//     "parse_object0.attribute0.name": "attrforob1",
+//     "parse_object0.attribute0.path_type": "xpath",
+//     "parse_object0.attribute0.path": "123123",
+//     "parse_object0.attribute0.typeof_attr": "simple",
+//     "parse_object0.attribute1.name": "books",
+//     "parse_object0.attribute1.path_type": "xpath",
+//     "parse_object0.attribute1.path": "aaaaaa",
+//     "parse_object0.attribute1.typeof_attr": "link",
+//     "parse_object0.attribute1.attribute2.name": "pri",
+//     "parse_object0.attribute1.attribute2.path_type": "xpath",
+//     "parse_object0.attribute1.attribute2.path": "asdf",
+//     "parse_object0.attribute1.attribute2.typeof_attr": "simple",
+//     "parse_object1.name": "objak",
+//     "parse_object1.path_type": "xpath",
+//     "parse_object1.path": "2222",
+//     "parse_object1.attribute3.name": "123123123",
+//     "parse_object1.attribute3.path_type": "xpath",
+//     "parse_object1.attribute3.path": "123123",
+//     "parse_object1.attribute3.typeof_attr": "simple"
+// };
+
+// const compiledData = recompileFormData(TEST_FOR_formData);
+// console.log(JSON.stringify(compiledData, null, 2));

@@ -55,7 +55,8 @@ export class PaginationSettings {
      * @param {number} max_pages 
      * @param {number} page_increment 
      */
-    constructor(enabled, next_page_selector = undefined, url_param_template = undefined, max_pages = 10, page_increment = 1) {
+    constructor(enabled, next_page_selector = undefined, url_param_template = undefined,
+        max_pages = 10, page_increment = 1) {
         this.enabled = enabled;
         this.next_page_selector = next_page_selector;
         this.url_param_template = url_param_template;
@@ -121,11 +122,6 @@ export class CrawlerRequest {
             console.error('Error:', error);
         }
 
-        console.log(JSON.stringify({
-            start_url: this.start_url,
-            crawler_settings: this.crawler_settings,
-            meta: this.meta
-        }));
         return ans;
     }
     toJSON() {
