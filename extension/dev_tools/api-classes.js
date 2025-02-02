@@ -20,7 +20,7 @@ export class Attribute {
      * @param {string} delimeter 
      * @param {Attribute[]} linked_attributes 
      */
-    constructor(name, caption, pathData, delimeter = undefined, type = 'simple', linked_attributes = undefined) {
+    constructor(name, caption, pathData, type = 'simple', linked_attributes = undefined, delimeter = undefined) {
         this.attribute_name = name;
         this.attribute_caption = caption;
         this.attribute_selector = pathData;
@@ -51,18 +51,16 @@ export class PaginationSettings {
      * 
      * @param {boolean} enabled 
      * @param {PathData} next_page_selector 
-     * @param {string} url_template 
-     * @param {number} start_page 
+     * @param {string} url_param_template 
      * @param {number} max_pages 
-     * @param {number} pagi_increment 
+     * @param {number} page_increment 
      */
-    constructor(enabled, next_page_selector = undefined, url_template = undefined, start_page = 1, max_pages = 10, pagi_increment = 1) {
+    constructor(enabled, next_page_selector = undefined, url_param_template = undefined, max_pages = 10, page_increment = 1) {
         this.enabled = enabled;
         this.next_page_selector = next_page_selector;
-        this.url_param_template = url_template;
-        this.start_page = start_page;
+        this.url_param_template = url_param_template;
         this.max_pages = max_pages;
-        this.page_increment = pagi_increment;
+        this.page_increment = page_increment;
     }
 }
 
@@ -129,5 +127,19 @@ export class CrawlerRequest {
             meta: this.meta
         }));
         return ans;
+    }
+    toJSON() {
+        return {
+            start_url: this.start_url,
+            crawler_settings: this.crawler_settings,
+            meta: this.meta
+        };
+    }
+    toString() {
+        return JSON.stringify({
+            start_url: this.start_url,
+            crawler_settings: this.crawler_settings,
+            meta: this.meta
+        });
     }
 }

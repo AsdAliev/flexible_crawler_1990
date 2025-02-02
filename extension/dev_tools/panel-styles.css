@@ -1,8 +1,8 @@
 .parse-object {
     margin: 8px 4px;
     padding: 4px;
-    border: blue solid 1px;
-    border-radius: 4px;
+    border: blue solid 2px;
+    border-radius: 6px;
 }
 
 .parse-object>* {
@@ -17,5 +17,9 @@
     padding: 2px;
     margin: 2px;
     border: grey solid 1px;
-    border-radius: 4px;
+    border-radius: 6px;
+}
+
+.parse-attribute-linked {
+    border: violet solid 1px;
 }
