@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Popup</title>
+    <link rel="stylesheet" href="popup-styles.css">
+</head>
+<body>
+    <div id="tabs">
+        <button id="requestsTabButton" class="tab-button active">Requests</button>
+    </div>
+
+    <div id="requestsSection" class="tab-content active">
+        <table id="requestsTable">
+            <thead>
+                <tr>
+                    <th>Request ID</th>
+                    <th>URL</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="requestsTableBody">
+                <!-- Таблица будет заполняться динамически -->
+            </tbody>
+        </table>
+
+        <div id="fileDownloadSection" class="download-section">
+            <label for="fileFormatSelect">File Format:</label>
+            <select id="fileFormatSelect">
+                <option value="json">JSON</option>
+                <option value="csv">CSV</option>
+                <option value="xml">XML</option>
+            </select>
+            <button id="downloadButton" class="download-btn">Download Results</button>
+        </div>
+    </div>
+
+    <script type="module" src="popup.js"></script>
+</body>
+</html>

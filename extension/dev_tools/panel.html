@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>CSS Selector & XPath</title>
+    <link href="panel-styles.css" rel="stylesheet" />
+</head>
+
+<body>
+    <h2>CSS Selector</h2>
+    <div id="css-selector">Select an element to see its CSS Selector...</div>
+
+    <h2>XPath</h2>
+    <div id="xpath">Select an element to see its XPath...</div>
+    <form id="objectForm">
+        <!-- NOTE Section -->
+        <div>
+            <p>
+                <input type="checkbox" id="noteCheckbox"> Pagination
+            </p>
+        </div>
+        <div id="noteSection" class="hidden">
+            <p>
+                Query param: <input type="text" id="noteName" name="noteName">
+            </p>
+            <p>
+                Iteration element: <input type="text" id="noteInfo" class="for-path" name="noteInfo">
+            </p>
+        </div>
+
+        <hr>
+
+        <div id="objectsContainer"></div>
+        <button type="button" class="btn-main" id="addObjectButton">+ Add Object</button>
+        <button type="submit" class="btn-main">Submit</button>
+    </form>
+    <script src="panel.js" type="module"></script>
+</body>
+
+</html>
