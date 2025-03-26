@@ -1,14 +1,18 @@
-from fastapi import FastAPI, BackgroundTasks
-from fastapi.responses import FileResponse, JSONResponse
-from pydantic import ValidationError
-import uvicorn
 import subprocess
 import os
 import uuid
 import json
 import csv
 import xml.etree.ElementTree as ET
+
 from threading import Lock
+from typing import Literal
+
+import uvicorn
+
+from fastapi import FastAPI, BackgroundTasks
+from fastapi.responses import FileResponse, JSONResponse
+
 from models import CrawlerRequest
 
 app = FastAPI(
@@ -20,9 +24,9 @@ app = FastAPI(
 # Создание папок для промежуточных результатов
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), "results")
 SCHEMAS_DIR = os.path.join(os.path.dirname(__file__), "schemas")
-for dir in [RESULTS_DIR, SCHEMAS_DIR]:
-    if not os.path.exists(dir):
-        os.makedirs(dir)
+for directory in [RESULTS_DIR, SCHEMAS_DIR]:
+    if not os.path.exists(directory):
+        os.makedirs(directory)
 
 # Словарь для хранения статусов задачи и формата выходного файла
 task_data = {}
@@ -115,7 +119,7 @@ def get_status(task_id: str):
 
 
 @app.get("/result/{task_id}")
-def get_result(task_id: str, output_format: str):
+def get_result(task_id: str, output_format: Literal["json", "csv", "xml"] = "json"):
     """
     Эндпоинт для получения файла результата задачи по Task ID.
     Возвращает файл в заданном формате, либо сообщение об ошибке в формате JSON.
@@ -186,8 +190,8 @@ def get_result(task_id: str, output_format: str):
         for item in items:
             item_element = ET.SubElement(root, "item")
             for key, value in item.items():
-                child = ET.SubElement(item_element, key)
-                child.text = str(value)
+                child = ET.SubElement(item_element, key.replace(" ", "_"))
+                child.text = str(value).replace("\xa0", " ")
         tree = ET.ElementTree(root)
         tree.write(output_path, encoding="utf-8", xml_declaration=True)
 
@@ -204,7 +208,6 @@ def get_result(task_id: str, output_format: str):
             },
             status_code=422
         )
-
 
 
 @app.delete("/delete/{task_id}")
