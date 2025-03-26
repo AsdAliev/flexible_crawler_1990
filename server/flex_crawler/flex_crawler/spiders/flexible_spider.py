@@ -9,13 +9,11 @@ from .utils import get_element_by_selector, extract_current_page_from_url
 class FlexibleSpider(scrapy.Spider):
     name = "flexible_spider"
 
-    # Эти переменные мы будем получать через аргументы командной строки (-a)
     def __init__(self, config_path, output_path, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.config_path = config_path
         self.output_path = output_path
 
-        # Читаем JSON-настройки из файла
         if self.config_path and os.path.exists(self.config_path):
             with open(self.config_path, "r", encoding="utf-8") as f:
                 self.config = json.load(f)
@@ -23,69 +21,84 @@ class FlexibleSpider(scrapy.Spider):
         self.start_page = None
 
     def start_requests(self):
-        # Берём start_url из конфигурации
         start_url = self.config.get("start_url")
-
         if start_url:
-            yield scrapy.Request(
-                url=start_url,
-                callback=self.parse
-            )
+            yield scrapy.Request(url=start_url, callback=self.parse)
+
+    def extract_attribute(self, element, attr):
+        """
+        Рекурсивно извлекает значение атрибута из элемента на основе его определения.
+        Поддерживаются типы: simple, array и nested.
+        """
+        attr_type = attr.get("attribute_type", "simple")
+        if attr_type == "simple":
+            selector_info = attr.get("attribute_selector", {})
+            path = selector_info.get("path", "")
+            selector_type = selector_info.get("selector_type", "xpath")
+            sub_elements = get_element_by_selector(element, path, selector_type)
+            extracted = sub_elements.get()
+            return extracted.strip() if extracted else None
+
+        elif attr_type == "array":
+            selector_info = attr.get("attribute_selector", {})
+            path = selector_info.get("path", "")
+            selector_type = selector_info.get("selector_type", "xpath")
+            sub_elements = get_element_by_selector(element, path, selector_type)
+            all_values = [v.get().strip() for v in sub_elements if v.get()]
+            delimiter = attr.get("delimiter", ";")
+            return delimiter.join(all_values)
+
+        elif attr_type == "nested":
+            nested_result = {}
+            for nested_attr in attr.get("nested_attributes", []):
+                # Рекурсивный вызов для вложенных атрибутов
+                nested_result[nested_attr.get("attribute_caption")] = self.extract_attribute(element, nested_attr)
+            return nested_result
+
+        # Для типа "link" возвращаем просто URL, а обработку ссылок оставляем в основном цикле
+        elif attr_type == "link":
+            selector_info = attr.get("attribute_selector", {})
+            path = selector_info.get("path", "")
+            selector_type = selector_info.get("selector_type", "xpath")
+            sub_elements = get_element_by_selector(element, path, selector_type)
+            link = sub_elements.get("href")
+            return link
+
+        else:
+            return None
 
     def parse(self, response):
-        """
-        Базовая логика парсинга.
-        Используем данные из self.config, чтобы понять, какие объекты нужно искать (meta),
-        как настроена пагинация и т.д.
-        """
-        # 1. Разбираем поле meta и извлекаем данные
         meta_objects = self.config.get("meta", [])
-
         for obj in meta_objects:
             object_selector_info = obj.get("object_selector", {})
             object_path = object_selector_info.get("path", "")
             object_selector_type = object_selector_info.get("selector_type", "xpath")
-
             if not object_path:
-                continue  # нет пути к объектам
+                continue
 
-            # Выбираем нужные элементы на странице
             elements = get_element_by_selector(response, object_path, object_selector_type)
-
             for element in elements:
                 item_data = {}
-                links_to_follow = []  # Список ссылок для последующей обработки
+                links_to_follow = []
 
-                # Парсим атрибуты
+                # Сначала обрабатываем все атрибуты, кроме типа "link"
                 for attr in obj.get("attributes", []):
-                    attribute_caption = attr.get("attribute_caption")
-
-                    attr_selector_info = attr.get("attribute_selector", {})
-                    attr_path = attr_selector_info.get("path", "")
-                    attr_selector_type = attr_selector_info.get("selector_type", "xpath")
-
                     attr_type = attr.get("attribute_type", "simple")
-                    delimiter = attr.get("delimiter", ";")
+                    if attr_type != "link":
+                        item_data[attr.get("attribute_caption")] = self.extract_attribute(element, attr)
 
-                    sub_elements = get_element_by_selector(element, attr_path, attr_selector_type)
-
-                    if attr_type == "simple":
-                        extracted = sub_elements.get()
-                        item_data[attribute_caption] = extracted.strip() if extracted else None
-                    elif attr_type == "array":
-                        all_values = [v.get().strip() for v in sub_elements if v.get()]
-                        item_data[attribute_caption] = delimiter.join(all_values)
-                    elif attr_type == "link":
-                        link = sub_elements.get("href")
+                # Затем обрабатываем атрибуты типа "link" отдельно (их linked_attributes могут тоже быть вложенными)
+                for attr in obj.get("attributes", []):
+                    if attr.get("attribute_type") == "link":
+                        link = self.extract_attribute(element, attr)
                         if link:
                             links_to_follow.append({
                                 "link": link,
-                                "linked_attributes": attr.get("linked_attributes", [])
+                                "linked_attributes": attr.get("linked_attributes", []),
+                                "item_data": item_data.copy()
                             })
 
-                # Если есть ссылки, запускаем обработку
                 if links_to_follow:
-                    # Указываем общее количество ссылок
                     remaining_links = len(links_to_follow)
                     for link_info in links_to_follow:
                         yield response.follow(
@@ -93,15 +106,14 @@ class FlexibleSpider(scrapy.Spider):
                             callback=self.parse_links,
                             meta={
                                 "linked_attributes": link_info["linked_attributes"],
-                                "item_data": item_data,
+                                "item_data": link_info["item_data"],
                                 "remaining_links": remaining_links
                             }
                         )
                 else:
-                    # Если ссылок нет, сразу сохраняем объект
                     yield item_data
 
-        # 2. Логика пагинации
+        # Логика пагинации (без изменений)
         pagination_settings = self.config.get("crawler_settings", {}).get("pagination", {})
         if pagination_settings.get("enabled"):
             url_param_template = pagination_settings.get("url_param_template", None)
@@ -109,13 +121,13 @@ class FlexibleSpider(scrapy.Spider):
             max_pages = pagination_settings.get("max_pages", 1)
 
             if url_param_template and next_page_selector_info:
-                pass  # Сообщение "Используйте ровно один способ обхода"
+                pass
 
             if url_param_template:
                 curr_url = response.url
                 current_page = extract_current_page_from_url(curr_url, url_param_template)
                 if current_page is None:
-                    pass  # Сообщение "Неверный url_param_template"
+                    pass
 
                 if self.start_page is None:
                     self.start_page = current_page
@@ -128,22 +140,14 @@ class FlexibleSpider(scrapy.Spider):
                         url_param_template.format(page_number=current_page),
                         url_param_template.format(page_number=next_page_number)
                     )
+                    yield response.follow(url=next_url, callback=self.parse)
 
-                    yield response.follow(
-                        url=next_url,
-                        callback=self.parse
-                    )
-
-            # Когда указывается XPath/CSS селектор "кнопки" Следующая страница
             elif next_page_selector_info:
                 current_page = response.meta.get("page_number", 1)
                 if current_page < max_pages:
                     next_page_path = next_page_selector_info.get("path", "")
                     next_page_selector_type = next_page_selector_info.get("selector_type", "xpath")
-
-                    # Ищем элемент ссылки
                     next_page_el = get_element_by_selector(response, next_page_path, next_page_selector_type)
-
                     if next_page_el:
                         next_page_link = next_page_el.attrib.get("href")
                         if next_page_link:
@@ -154,32 +158,15 @@ class FlexibleSpider(scrapy.Spider):
                             )
 
     def parse_links(self, response):
-        """
-        Парсинг данных из linked_attributes для ссылки.
-        В response meta лежит
-        * список аттрибутов, которые будем брать с нового сайта,
-        * уже собранная информация про объект
-        * количество ссылок, чтобы не повторяться в результатах
-        """
         linked_attributes = response.meta.get("linked_attributes", [])
         item_data = response.meta.get("item_data", {})
-        remaining_links = response.meta.get("remaining_links", 1) - 1  # Уменьшаем счётчик ссылок
+        remaining_links = response.meta.get("remaining_links", 1) - 1
 
         for linked_attr in linked_attributes:
-            linked_attr_caption = linked_attr.get("attribute_caption")
-
-            linked_attr_selector_info = linked_attr.get("attribute_selector", {})
-            linked_attr_path = linked_attr_selector_info.get("path", "")
-            linked_attr_selector_type = linked_attr_selector_info.get("selector_type", "xpath")
-
-            sub_elements = get_element_by_selector(response, linked_attr_path, linked_attr_selector_type)
-
-            extracted = sub_elements.get()
-            item_data[linked_attr_caption] = extracted.strip() if extracted else None
+            # Здесь используем рекурсивную обработку для linked_attributes, предполагая, что они могут быть вложенными
+            item_data[linked_attr.get("attribute_caption")] = self.extract_attribute(response, linked_attr)
 
         if remaining_links == 0:
-            # Сохраняем объект только после обработки последней ссылки
             yield item_data
         else:
-            # Передаём обновлённое количество оставшихся ссылок
             response.meta["remaining_links"] = remaining_links
