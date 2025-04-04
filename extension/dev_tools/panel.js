@@ -84,7 +84,7 @@ const FormHelper = {
         const attribute = document.createElement('div');
         attribute.classList.add('parse-attribute');
         if (islinked) {
-            attribute.classList.add('parse-attribute-linked');
+            attribute.classList.add('parse-attribute_linked');
         }
         attribute.id = parentId + `.attribute${FormHelper.attributeCounter++}`;
 
@@ -115,19 +115,19 @@ const FormHelper = {
         const typeContainer = FormHelper.createTypeForAttribute(attribute.id);
         attribute.insertBefore(typeContainer.div, createAttrBtn);
         typeContainer.selector.addEventListener('change', () => {
-            const elsToRm = attribute.querySelectorAll('parse-attribute');
+            const elsToRm = attribute.querySelectorAll('.parse-attribute');
             createAttrBtn.onclick = () => attribute.insertBefore(FormHelper.createAttribute(attribute.id),
                 createAttrBtn);
             createAttrBtn.disabled = false;
             for (let i of elsToRm) {
-                attribute.removeAttribute(i);
+                i.remove();
             }
             if (typeContainer.selector.value == 'simple') {
                 createAttrBtn.disabled = true;
             } else if (typeContainer.selector.value == 'link') {
                 createAttrBtn.onclick = () => attribute.insertBefore(FormHelper.createAttribute(attribute.id, true),
                     createAttrBtn);
-            } else if (typeContainer.selector.value == 'array') {
+            } else if (typeContainer.selector.value == 'nested') {
                 console.log("TODO mode");
             }
         });
@@ -145,9 +145,13 @@ const FormHelper = {
         const span = document.createElement('span');
         span.textContent = 'Attribute type:';
         const sel = document.createElement('select');
-        sel.innerHTML = `<option selected>simple</option>
-                         <option>link</option>
-                         <option>array</option>`;
+
+        sel.innerHTML =
+            `<option selected value="simple">simple</option>
+             <option value="link">link</option>
+             <option value="nested">nested</option>
+            `;
+
         sel.name = `${attributeId + '.typeof_attr'}`
         typeAttr.appendChild(span);
         typeAttr.appendChild(sel);
@@ -245,121 +249,112 @@ function getRequestMeta() {
 }
 
 /**
- * Recompile form data into an array of ObjectMeta instances.
- *
- * @param {object} formData - The input form data using dot notation keys.
- * @returns {ObjectMeta[]} - Array of ObjectMeta objects.
+ * Функция преобразования flat-структуры formData в дерево объектов с атрибутами
+ * @param {Object} formData – объект, полученный из FormData
+ * @returns {ObjectMeta[]} - массив объектов для CrawlerRequest
  */
 function recompileFormData(formData) {
-    // Build a nested structure for each object.
     const objects = {};
 
-    // Helper to set a nested property given an array of keys.
-    function setNestedValue(target, keys, value) {
-        const key = keys[0];
-        if (keys.length === 1) {
-            target[key] = value;
-            return;
+    // Функция для обновления дерева атрибутов.
+    // tree — объект, где ключи – id атрибутов, значения: { data, children }
+    function updateAttrTree(tree, attrPath, prop, value) {
+        if (attrPath.length === 0) return;
+        const key = attrPath[0];
+        if (!tree[key]) {
+            tree[key] = { data: {}, children: {} };
         }
-        if (!(key in target)) {
-            target[key] = {};
+        if (attrPath.length === 1) {
+            // Устанавливаем свойство для текущего атрибута
+            tree[key].data[prop] = value;
+        } else {
+            // Рекурсивно для вложенных атрибутов
+            updateAttrTree(tree[key].children, attrPath.slice(1), prop, value);
         }
-        setNestedValue(target[key], keys.slice(1), value);
     }
 
-    // Process each key in the form data.
-    for (const fullKey in formData) {
-        const value = formData[fullKey];
-        const parts = fullKey.split('.');
-        // The first part must be like "parse_object0"
-        if (!parts[0].startsWith('parse_object')) {
-            continue;
-        }
-        const objectKey = parts[0]; // e.g. "parse_object0"
-        if (!objects[objectKey]) {
-            // Initialize the object container with attributes.
-            objects[objectKey] = { attributes: {} };
-        }
-        // If there are only two parts, the property is on the object itself.
+    // Первый проход: собираем объекты и атрибуты в виде промежуточного дерева
+    for (const [key, value] of Object.entries(formData)) {
+        const parts = key.split('.');
+        if (!parts[0].startsWith('parse_object')) continue;
+        const objectId = parts[0];
+
+        // Если это свойство объекта (например, name, path, path_type)
         if (parts.length === 2) {
-            objects[objectKey][parts[1]] = value;
-        } else if (parts.length >= 3) {
-            // Otherwise the property belongs to an attribute tree.
-            // For instance, parts like ["attribute0", "name"] or ["attribute1", "attribute2", "path"].
-            const attrPath = parts.slice(1);
-            setNestedValue(objects[objectKey].attributes, attrPath, value);
-        }
-    }
-
-    // Helper function to recursively convert a nested attribute tree into Attribute instances.
-    function convertAttributes(attrTree) {
-        const attributes = [];
-        // Each key is expected to be like "attribute0", "attribute1", etc.
-        for (const attrKey in attrTree) {
-            const attrData = attrTree[attrKey];
-            // Create a PathData instance for this attribute's selector.
-            const pathData = new PathData(
-                attrData.path || "",
-                attrData.path_type || "xpath"
-            );
-
-            // Process nested linked attributes.
-            const linked = [];
-            // Loop over the keys in attrData to see if there are nested attribute objects.
-            for (const key in attrData) {
-                // Skip keys that are standard for an attribute.
-                if (["name", "path_type", "path", "typeof_attr", "delimiter"].includes(key)) {
-                    continue;
-                }
-                // If the key starts with "attribute" and the value is an object, assume it's a nested attribute.
-                if (key.startsWith("attribute") && typeof attrData[key] === "object") {
-                    // The nested object might itself contain multiple attributes, so we convert it.
-                    const nestedAttributes = convertAttributes({ [key]: attrData[key] });
-                    linked.push(...nestedAttributes);
-                }
+            if (!objects[objectId]) {
+                objects[objectId] = { data: {}, attrTree: {} };
             }
-
-            // Create an Attribute instance.
-            // Here we use the "name" property from the form for both the unique name and caption.
-            // You can modify this logic if needed.
-            const attribute = new Attribute(
-                attrData.name,
-                attrData.name,
-                pathData,
-                attrData.typeof_attr || "simple",
-                linked.length > 0 ? linked : undefined,
-                attrData.delimiter
-            );
-            attributes.push(attribute);
+            objects[objectId].data[parts[1]] = value;
+        } else if (parts.length >= 3) {
+            // Это свойство атрибута
+            // Например: parse_object0.attribute1.attribute2.name
+            if (!objects[objectId]) {
+                objects[objectId] = { data: {}, attrTree: {} };
+            }
+            // Атрибуты: начинаются со второго элемента
+            // Фильтруем только сегменты, содержащие "attribute"
+            const attrPath = parts.slice(1).filter(p => p.startsWith('attribute'));
+            // Последний сегмент в исходном ключе может быть не "attribute", а название свойства
+            const prop = parts[parts.length - 1];
+            updateAttrTree(objects[objectId].attrTree, attrPath, prop, value);
         }
-        return attributes;
     }
 
-    // Convert our objects container into an array of ObjectMeta instances.
-    const result = [];
-    for (const objectKey in objects) {
-        const obj = objects[objectKey];
-        // Create a PathData instance for the object selector.
-        const objPath = obj.path || "";
-        const objSelectorType = obj.path_type || "xpath";
-        const objectPathData = new PathData(objPath, objSelectorType);
-
-        // Convert attributes for this object.
-        const attributes = convertAttributes(obj.attributes);
-
-        // Create the ObjectMeta instance.
-        // We use the "name" property from the form for both the unique name and caption.
-        const objectMeta = new ObjectMeta(
-            obj.name,
-            obj.name,
-            objectPathData,
-            attributes
-        );
-        result.push(objectMeta);
+    // Функция для рекурсивного преобразования дерева атрибутов в массив экземпляров Attribute
+    function buildAttributes(tree) {
+        const result = [];
+        for (const key in tree) {
+            if (tree.hasOwnProperty(key)) {
+                const node = tree[key];
+                const data = node.data;
+                // Имя и caption
+                const name = data.name || '';
+                const caption = data.name || '';
+                // Путь
+                const path = data.path || '';
+                const selectorType = data.path_type || 'xpath';
+                const pathData = new PathData(path, selectorType);
+                // Тип атрибута
+                const type = data.typeof_attr || 'simple';
+                // Рекурсивно обрабатываем вложенные атрибуты
+                const children = buildAttributes(node.children);
+                // В зависимости от типа распределяем вложенные атрибуты
+                let linked_attributes = [];
+                let nested_attributes = [];
+                if (type === 'link') {
+                    linked_attributes = children;
+                } else if (type === 'nested') {
+                    nested_attributes = children;
+                }
+                // Если delimiter требуется, можно добавить data.delimiter (если есть)
+                const delimiter = data.delimeter;
+                // Создаем экземпляр Attribute
+                const attr = new Attribute(name, caption, pathData, type, linked_attributes, nested_attributes, delimiter);
+                result.push(attr);
+            }
+        }
+        return result;
     }
 
-    return result;
+    // Преобразуем собранные данные в массив экземпляров ObjectMeta
+    const objectsMeta = [];
+    for (const objectId in objects) {
+        if (objects.hasOwnProperty(objectId)) {
+            const obj = objects[objectId];
+            const data = obj.data;
+            const name = data.name || '';
+            const caption = data.name || '';
+            const path = data.path || '';
+            const selectorType = data.path_type || 'xpath';
+            const pathData = new PathData(path, selectorType);
+            const attributes = buildAttributes(obj.attrTree);
+            objectsMeta.push(new ObjectMeta(name, caption, pathData, attributes));
+        }
+    }
+    return objectsMeta;
 }
+
+
 
 // // test usage:
 // const TEST_FOR_formData = {

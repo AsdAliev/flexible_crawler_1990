@@ -19,14 +19,16 @@ export class Attribute {
      * @param {'simple' | 'array' | 'link'} type 
      * @param {string} delimeter 
      * @param {Attribute[]} linked_attributes 
+     * @param {Attribute[]} nested_attributes
      */
-    constructor(name, caption, pathData, type = 'simple', linked_attributes = undefined, delimeter = undefined) {
+    constructor(name, caption, pathData, type = 'simple', linked_attributes = undefined, nested_attributes = undefined, delimeter = undefined) {
         this.attribute_name = name;
         this.attribute_caption = caption;
         this.attribute_selector = pathData;
         this.attribute_type = type;
         this.delimiter = delimeter;
         this.linked_attributes = linked_attributes;
+        this.nested_attributes = nested_attributes;
     }
 }
 
@@ -60,8 +62,17 @@ export class PaginationSettings {
         this.enabled = enabled;
         this.next_page_selector = next_page_selector;
         this.url_param_template = url_param_template;
-        this.max_pages = max_pages;
-        this.page_increment = page_increment;
+        if (enabled) {
+            this.max_pages = max_pages;
+            if (url_param_template) {
+                this.page_increment = page_increment;
+            } else {
+                this.page_increment = undefined;
+            }
+        } else {
+            this.max_pages = undefined;
+            this.page_increment = undefined;
+        }
     }
 }
 
