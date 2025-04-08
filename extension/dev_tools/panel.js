@@ -29,15 +29,17 @@ const FormHelper = {
      */
     createObject: (form) => {
         const object = document.createElement('div');
-        object.classList.add('parse-object');
+        object.classList.add('parse-object', 'border', 'rounded', 'p-3', 'mb-3');
         object.id = `parse_object${FormHelper.objectCounter++}`;
         //values
         const nameContainer = document.createElement('div');
-        nameContainer.classList.add('object-info');
+        nameContainer.classList.add('object-info', 'mb-3');
 
-        const span = document.createElement('span');
-        span.textContent = "Object name:"
+        const span = document.createElement('label');
+        span.classList.add('form-label');
+        span.textContent = "Имя объекта"
         const name = document.createElement('input');
+        name.classList.add('form-control');
         name.name = object.id + '.name'
         nameContainer.appendChild(span);
         nameContainer.appendChild(name);
@@ -48,41 +50,44 @@ const FormHelper = {
 
         //create attribute btn
         const createAttrBtn = document.createElement('button')
-        createAttrBtn.textContent = 'Add attribute';
+        createAttrBtn.textContent = 'Добавить атрибут';
         object.appendChild(createAttrBtn);
         createAttrBtn.type = 'button';
+        createAttrBtn.classList.add('btn', 'btn-secondary', 'mt-2', 'me-2');
         createAttrBtn.onclick = () => object.insertBefore(FormHelper.createAttribute(object.id),
             createAttrBtn);
 
         //rm button
         const rmbtn = document.createElement('button');
         rmbtn.onclick = () => form.removeChild(object);
-        rmbtn.textContent = 'Remove object';
+        rmbtn.textContent = 'Удалить объект';
         rmbtn.type = 'button';
+        rmbtn.classList.add('btn', 'btn-danger', 'mt-2');
         object.appendChild(rmbtn);
 
         return object;
     },
     createPathInput: (parentId) => {
         const path = document.createElement('div');
+        path.classList.add('mb-3');
         path.innerHTML = `
-            <div>
-                <span>Path type:</span>
-                <select name=${parentId + '.path_type'}>
+            <div class="form-floating mb-2">
+                <select name=${parentId + '.path_type'} class="form-select">
                     <option selected>xpath</option>
                     <option>css</option>
                 </select>
+                <label>Тип пути</label>
             </div>
-            <div> 
-                <span>Path:</span>
-                <input type="text" name=${parentId + '.path'}>
+            <div class="form-floating">
+                <input type="text" name=${parentId + '.path'} class="form-control" placeholder="Путь">
+                <label>Путь</label>
             </div> 
         `;
         return path;
     },
     createAttribute: (parentId, islinked = false) => {
         const attribute = document.createElement('div');
-        attribute.classList.add('parse-attribute');
+        attribute.classList.add('parse-attribute', 'border', 'rounded', 'p-3', 'mb-3');
         if (islinked) {
             attribute.classList.add('parse-attribute_linked');
         }
@@ -90,11 +95,13 @@ const FormHelper = {
 
         //values
         const nameContainer = document.createElement('div');
-        nameContainer.classList.add('object-info');
+        nameContainer.classList.add('object-info', 'mb-3');
 
-        const nameSpan = document.createElement('span');
-        nameSpan.textContent = "Attribute name:"
+        const nameSpan = document.createElement('label');
+        nameSpan.classList.add('form-label');
+        nameSpan.textContent = "Название атрибута"
         const name = document.createElement('input');
+        name.classList.add('form-control');
         name.name = attribute.id + '.name'
         nameContainer.appendChild(nameSpan);
         nameContainer.appendChild(name);
@@ -104,8 +111,9 @@ const FormHelper = {
         attribute.appendChild(path)
         //create attribute btn
         const createAttrBtn = document.createElement('button')
-        createAttrBtn.textContent = 'Add attribute';
+        createAttrBtn.textContent = 'Добавить атрибут';
         createAttrBtn.type = 'button';
+        createAttrBtn.classList.add('btn', 'btn-secondary', 'me-2');
         attribute.appendChild(createAttrBtn);
         createAttrBtn.onclick = () => attribute.insertBefore(FormHelper.createAttribute(attribute.id),
             createAttrBtn);
@@ -114,6 +122,7 @@ const FormHelper = {
         //add type selector
         const typeContainer = FormHelper.createTypeForAttribute(attribute.id);
         attribute.insertBefore(typeContainer.div, createAttrBtn);
+        typeContainer.div.classList.add('mb-3');
         typeContainer.selector.addEventListener('change', () => {
             const elsToRm = attribute.querySelectorAll('.parse-attribute');
             createAttrBtn.onclick = () => attribute.insertBefore(FormHelper.createAttribute(attribute.id),
@@ -134,22 +143,25 @@ const FormHelper = {
         //rm button
         const rmbtn = document.createElement('button');
         rmbtn.onclick = () => document.getElementById(parentId).removeChild(attribute);
-        rmbtn.textContent = 'Remove attribute';
+        rmbtn.textContent = 'Убрать атрибут';
         rmbtn.type = 'button';
+        rmbtn.classList.add('btn', 'btn-danger');
         attribute.appendChild(rmbtn);
 
         return attribute;
     },
     createTypeForAttribute: (attributeId) => {
         const typeAttr = document.createElement('div');
-        const span = document.createElement('span');
-        span.textContent = 'Attribute type:';
+        const span = document.createElement('label');
+        span.textContent = 'Тип атрибута:';
+        span.classList.add('form-label', 'me-2');
         const sel = document.createElement('select');
+        sel.classList.add('form-select', 'w-auto', 'd-inline-block');
 
         sel.innerHTML =
-            `<option selected value="simple">simple</option>
-             <option value="link">link</option>
-             <option value="nested">nested</option>
+            `<option selected value="simple">Простой</option>
+             <option value="link">Ссылка</option>
+             <option value="nested">Узел</option>
             `;
 
         sel.name = `${attributeId + '.typeof_attr'}`
@@ -192,10 +204,10 @@ function setupParseSettings() {
 
     const paginationType = document.getElementById('pagination-type');
     paginationType.addEventListener('change', () => {
-        if (paginationType.value == 'Next element') {
+        if (paginationType.value == '0') {
             document.getElementById('next-pagination-elem').style.display = 'block';
             document.getElementById('pagination-query-param').style.display = 'none';
-        } else if (paginationType.value == 'URL param') {
+        } else if (paginationType.value == '1') {
             document.getElementById('next-pagination-elem').style.display = 'none';
             document.getElementById('pagination-query-param').style.display = 'block';
         }
@@ -208,12 +220,9 @@ function setupParseSettings() {
  */
 function setupParseForm(parseForm) {
     // create button to add object
-    const createObjBtn = document.createElement('button');
-    createObjBtn.onclick = () => parseForm.insertBefore(FormHelper.createObject(parseForm),
-        document.getElementById('form-submit'));
-    createObjBtn.textContent = 'Add object';
-    createObjBtn.type = 'button';
-    parseForm.appendChild(createObjBtn);
+    const addObjBtn = document.getElementById('add-object-button');
+    addObjBtn.onclick = () => parseForm.insertBefore(FormHelper.createObject(parseForm),
+        document.getElementById('init-form-buttons'));
 }
 
 function getParseSettings() {
@@ -226,7 +235,7 @@ function getPaginationSettings() {
     if (!document.getElementById('enable-pagination').checked) {
         return new PaginationSettings(false);
     }
-    if (pagType.value == 'Next element') {
+    if (pagType.value == '0') {
         return new PaginationSettings(true,
             new PathData(document.getElementById('next-pagination-elem-path').value.trim(),
                 document.getElementById('pagination-path-type').value.trim()),
