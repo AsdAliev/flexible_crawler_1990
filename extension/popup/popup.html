@@ -1,13 +1,68 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="auto">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Popup</title>
-    <link rel="stylesheet" href="popup-styles.css">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="../styles/popup-styles.css">
+    <link href="../styles/bootstrap.min.css" rel="stylesheet" />
 </head>
+
 <body>
-    <div id="tabs">
+
+    <nav class="navbar navbar-expand bg-body-tertiary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">Парсер <img src="../icons/16_image.png" alt=""></a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNavDropdown"
+                aria-controls="navbarNavDropdown" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNavDropdown">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a id="request-nav" class="nav-link active" href="#">Запросы</a>
+                    </li>
+                    <li class="nav-item">
+                        <a id="settings-nav" class="nav-link" href="#">Настройки</a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a id="profile-nav" class="nav-link dropdown-toggle" href="#" role="button"
+                            data-bs-toggle="dropdown" aria-expanded="false">
+                            Профиль
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a id="profile-log-nav" class="dropdown-item" href="#">Войти/Выйти</a></li>
+                            <li><a id="profile-registration-nav" class="dropdown-item" href="#">Регистрация</a></li>
+                            <li><a id="profile-change-pswd-nav" class="dropdown-item" href="#">Сменить пароль</a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container main-page-content d-none" id="requests-container">
+        Список реквестов
+    </div>
+
+    <div class="container main-page-content d-none" id="settings-container">
+        Настройки
+    </div>
+
+    <div class="container main-page-content d-none" id="profile-log-container">
+        Логин
+    </div>
+
+    <div class="container main-page-content d-none" id="profile-register-container">
+        Регистрация
+    </div>
+
+    <div class="container main-page-content d-none" id="profile-change-pswd-container">
+        Смена пароля
+    </div>
+
+    <!-- <div id="tabs">
         <button id="requestsTabButton" class="tab-button active">Requests</button>
     </div>
 
@@ -21,7 +76,6 @@
                 </tr>
             </thead>
             <tbody id="requestsTableBody">
-                <!-- Таблица будет заполняться динамически -->
             </tbody>
         </table>
 
@@ -34,8 +88,11 @@
             </select>
             <button id="downloadButton" class="download-btn">Download Results</button>
         </div>
-    </div>
+    </div> -->
 
     <script type="module" src="popup.js"></script>
+    <script src="../styles/bootstrap.bundle.min.js"></script>
+    <script src="../styles/light-dark-switcher.js"></script>
 </body>
+
 </html>

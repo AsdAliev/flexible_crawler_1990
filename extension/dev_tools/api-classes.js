@@ -19,14 +19,16 @@ export class Attribute {
      * @param {'simple' | 'array' | 'link'} type 
      * @param {string} delimeter 
      * @param {Attribute[]} linked_attributes 
+     * @param {Attribute[]} nested_attributes
      */
-    constructor(name, caption, pathData, delimeter = undefined, type = 'simple', linked_attributes = undefined) {
+    constructor(name, caption, pathData, type = 'simple', linked_attributes = undefined, nested_attributes = undefined, delimeter = undefined) {
         this.attribute_name = name;
         this.attribute_caption = caption;
         this.attribute_selector = pathData;
         this.attribute_type = type;
         this.delimiter = delimeter;
         this.linked_attributes = linked_attributes;
+        this.nested_attributes = nested_attributes;
     }
 }
 
@@ -51,34 +53,40 @@ export class PaginationSettings {
      * 
      * @param {boolean} enabled 
      * @param {PathData} next_page_selector 
-     * @param {string} url_template 
-     * @param {number} start_page 
+     * @param {string} url_param_template 
      * @param {number} max_pages 
-     * @param {number} pagi_increment 
+     * @param {number} page_increment 
      */
-    constructor(enabled, next_page_selector = undefined, url_template = undefined, start_page = 1, max_pages = 10, pagi_increment = 1) {
+    constructor(enabled, next_page_selector = undefined, url_param_template = undefined,
+        max_pages = 10, page_increment = 1) {
         this.enabled = enabled;
         this.next_page_selector = next_page_selector;
-        this.url_param_template = url_template;
-        this.start_page = start_page;
-        this.max_pages = max_pages;
-        this.page_increment = pagi_increment;
+        this.url_param_template = url_param_template;
+        if (enabled) {
+            this.max_pages = max_pages;
+            if (url_param_template) {
+                this.page_increment = page_increment;
+            } else {
+                this.page_increment = undefined;
+            }
+        } else {
+            this.max_pages = undefined;
+            this.page_increment = undefined;
+        }
     }
 }
 
 export class CrawlerSettings {
     /**
      * 
-     * @param {'csv' | 'json' | 'xlsx'} output_file_format 
      * @param {PaginationSettings} pagination 
      * @param {number} request_delay 
      * @param {string[]} allowed_domains 
      * @param {{str:str}} request_headers 
      */
-    constructor(pagination, request_delay, output_file_format = 'json', allowed_domains = undefined, request_headers = undefined) {
+    constructor(pagination, request_delay, allowed_domains = undefined, request_headers = undefined) {
         this.request_headers = request_delay;
         this.request_delay = request_delay;
-        this.output_file_format = output_file_format;
         this.allowed_domains = allowed_domains;
         this.pagination = pagination;
         this.request_headers = request_headers
@@ -125,11 +133,20 @@ export class CrawlerRequest {
             console.error('Error:', error);
         }
 
-        console.log(JSON.stringify({
+        return ans;
+    }
+    toJSON() {
+        return {
             start_url: this.start_url,
             crawler_settings: this.crawler_settings,
             meta: this.meta
-        }));
-        return ans;
+        };
+    }
+    toString() {
+        return JSON.stringify({
+            start_url: this.start_url,
+            crawler_settings: this.crawler_settings,
+            meta: this.meta
+        });
     }
 }
