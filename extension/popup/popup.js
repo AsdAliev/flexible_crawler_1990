@@ -13,11 +13,11 @@ function authentificateAccount() {
 }
 
 function setupNavbar() {
-    document.getElementById('request-nav').addEventListener('click', () => { activateRequestPage(); });
-    document.getElementById('settings-nav').addEventListener('click', () => { activateSettingsPage(); });
-    document.getElementById('profile-registration-nav').addEventListener('click', () => { activateProfileRegistrationPage(); });
-    document.getElementById('profile-log-nav').addEventListener('click', () => { activateProfileLoginPage(); });
-    document.getElementById('profile-change-pswd-nav').addEventListener('click', () => { activateProfileChangePasswordPage(); });
+    document.getElementById('request-nav').addEventListener('click', activateRequestPage);
+    document.getElementById('settings-nav').addEventListener('click', activateSettingsPage);
+    document.getElementById('profile-registration-nav').addEventListener('click', activateProfileRegistrationPage);
+    document.getElementById('profile-log-nav').addEventListener('click', activateProfileLoginPage);
+    document.getElementById('profile-change-pswd-nav').addEventListener('click', activateProfileChangePasswordPage);
 }
 
 function activateRequestPage() {

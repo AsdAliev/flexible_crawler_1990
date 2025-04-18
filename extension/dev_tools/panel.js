@@ -184,13 +184,39 @@ parseForm.addEventListener('submit', (e) => {
 })
 
 async function sendParseRequest() {
-    const start_url = (await chrome.runtime.sendMessage({ action: "getActiveTab" }))?.url; // TODO
-    const objectMeta = getRequestMeta();
-    const parse_settings = getParseSettings();
-    const req = new CrawlerRequest(start_url, parse_settings, objectMeta);
-    console.log(req.toJSON());
-    req.sendParsingTask();
+    try {
+        const start_url = (await chrome.runtime.sendMessage({ action: "getActiveTab" }))?.url; // TODO
+        const objectMeta = getRequestMeta();
+        const parse_settings = getParseSettings();
+        const req = new CrawlerRequest(start_url, parse_settings, objectMeta);
+        console.log(req.toJSON());
+        const answer = await req.sendParsingTask();
+        showModal(answer);
+    }
+    catch (error) {
+        console.log(error);
+        showModal(error, false);
+    }
 }
+
+function showModal(msg, isOk = true) {
+    const modalBtn = document.getElementById("openModalBtn");
+    modalBtn.click();
+    if (isOk) {
+        document.getElementById('staticBackdropLabel').textContent = "Запрос принят сервером"
+        document.getElementById('modalBody__container').textContent = JSON.stringify(msg, null, 2);
+    } else {
+        document.getElementById('staticBackdropLabel').textContent = "Ошибка"
+        document.getElementById('modalBody__container').textContent = `${msg.message}`;
+    }
+}
+
+document.getElementById('clear-form-btn').addEventListener('click', () => {
+    let elems = parseForm.querySelectorAll('.parse-object, .parse-attribute')
+    for (let i of elems) {
+        i.remove();
+    }
+});
 
 function setupParseSettings() {
     const enablePagination = document.getElementById('enable-pagination');
