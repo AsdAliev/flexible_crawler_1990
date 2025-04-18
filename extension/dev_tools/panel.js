@@ -3,6 +3,7 @@ import {
     PathData, Attribute, ObjectMeta,
     PaginationSettings, CrawlerSettings, CrawlerRequest
 } from "./api-classes.js";
+import * as requestDB from '../storage/request-storage.js';
 
 // add listener to get path for parse elements
 chrome.devtools.panels.elements.onSelectionChanged.addListener(() => {
@@ -188,9 +189,21 @@ async function sendParseRequest() {
         const start_url = (await chrome.runtime.sendMessage({ action: "getActiveTab" }))?.url; // TODO
         const objectMeta = getRequestMeta();
         const parse_settings = getParseSettings();
+
         const req = new CrawlerRequest(start_url, parse_settings, objectMeta);
         console.log(req.toJSON());
+
         const answer = await req.sendParsingTask();
+        const reqId = answer.task_id;
+        const reqStatus = answer.status;
+
+        requestDB.addRequest({
+            id: reqId,
+            status: reqStatus,
+            name: document.getElementById('request-name-input').value.trim(),
+            request: req
+        });
+
         showModal(answer);
     }
     catch (error) {

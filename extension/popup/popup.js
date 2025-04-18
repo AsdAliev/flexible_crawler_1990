@@ -1,11 +1,12 @@
 // popup.js
-
+import * as requestDB from '../storage/request-storage.js';
 initPopup();
 
 function initPopup() {
     authentificateAccount();
     setupNavbar();
     activateRequestPage();
+    fillRequestList();
 }
 
 function authentificateAccount() {
@@ -65,8 +66,47 @@ function setActiveMainPage(id) {
     document.getElementById(id).ariaCurrent = 'page';
 }
 
+async function fillRequestList() {
+    const reqList = document.getElementById('requests-container');
+    reqList.innerHTML = '';
+    const reqs = await requestDB.getRecentRequests();
+    console.log(reqs);
+    for (let i of reqs) {
+        reqList.appendChild(createRequestCard(i));
+    }
+}
+/**
+ * 
+ * @param {{id: string, status: string, name: string, request: object, createdAt: Date}} request 
+ * @returns 
+ */
+function createRequestCard(request) {
+    const card = document.createElement('div');
+    card.classList.add('card');
+    card.innerHTML = `
+        <div class="card-body">
+            <h5 class="card-title">${request.name}</h5>
+            <h6 class="card-subtitle mb-2 text-body-secondary">${formatDate(new Date(request.createdAt))}</h6>
+            <p class="card-text">Статус: ${request.status}</p>
+            <p class="card-text">ID: ${request.id}</p>
+        </div>
+    `;
+    return card;
+}
 
+function formatDate(date) {
+    const pad = (num) => num.toString().padStart(2, '0');
 
+    const hours = pad(date.getHours());
+    const minutes = pad(date.getMinutes());
+    const seconds = pad(date.getSeconds());
+
+    const day = pad(date.getDate());
+    const month = pad(date.getMonth() + 1); // Months are 0-based
+    const year = date.getFullYear();
+
+    return `${hours}:${minutes}:${seconds} ${day}-${month}-${year}`;
+}
 
 
 
