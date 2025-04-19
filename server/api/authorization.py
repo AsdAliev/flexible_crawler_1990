@@ -139,12 +139,22 @@ def refresh_token(data: dict):
     if not token:
         raise HTTPException(status_code=400, detail="Refresh token required")
 
-    user_id = verify_token(token, expected_type="refresh")
+    try:
+        user_id = verify_token(token, expected_type="refresh")
+    except HTTPException as e:
+        # Если токен просрочен — пробуем удалить его из БД
+        if e.detail == "Token expired":
+            conn = sqlite3.connect("users.db")
+            c = conn.cursor()
+            c.execute("DELETE FROM refresh_tokens WHERE token = ?", (token,))
+            conn.commit()
+            conn.close()
+        raise e
 
     conn = sqlite3.connect("users.db")
     c = conn.cursor()
 
-    # Ищем токен
+    # Ищем токен в БД
     c.execute("SELECT id FROM refresh_tokens WHERE user_id = ? AND token = ?", (user_id, token))
     row = c.fetchone()
     if not row:
@@ -154,18 +164,17 @@ def refresh_token(data: dict):
     # Удаляем использованный refresh-токен
     c.execute("DELETE FROM refresh_tokens WHERE id = ?", (row[0],))
 
-    # Проверяем количество токенов и при необходимости удаляем самый старый
+    # Ограничение на 5 токенов
     c.execute("SELECT id FROM refresh_tokens WHERE user_id = ? ORDER BY created_at ASC", (user_id,))
     existing_tokens = c.fetchall()
     if len(existing_tokens) >= 5:
         oldest_id = existing_tokens[0][0]
         c.execute("DELETE FROM refresh_tokens WHERE id = ?", (oldest_id,))
 
-    # Создаём новые токены
+    # Генерируем новые токены
     new_access_token, _ = create_token(user_id, "access")
     new_refresh_token, refresh_exp = create_token(user_id, "refresh")
 
-    # Сохраняем новый refresh-токен
     c.execute("""
         INSERT INTO refresh_tokens (user_id, token, expires_at, created_at)
         VALUES (?, ?, ?, ?)
@@ -208,3 +217,14 @@ def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
     conn.close()
 
     return {"message": "Token revoked and refresh token removed"}
+
+# === Очистка просроченых токенов === [реализована в /refresh]
+# Фоновая периодическая задача
+# (будет запускаться как сервис или просто по расписанию через cron)
+# def clean_expired_tokens():
+#     conn = sqlite3.connect("users.db")
+#     c = conn.cursor()
+#     c.execute("DELETE FROM refresh_tokens WHERE expires_at < ?", (datetime.utcnow().isoformat(),))
+#     conn.commit()
+#     conn.close()
+
