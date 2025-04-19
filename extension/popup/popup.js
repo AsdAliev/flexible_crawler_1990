@@ -65,10 +65,147 @@ function setActiveMainPage(id) {
     document.getElementById(id).ariaCurrent = 'page';
 }
 
+async function loginUser(username, password) {
+    const errorDiv = document.getElementById("login-error");
 
+    try {
+        const res = await fetch("http://localhost:8000/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password }),
+        });
 
+        const data = await res.json();
 
+        if (!res.ok) {
+            errorDiv.textContent = data.detail || "Ошибка входа";
+            return false;
+        }
 
+        localStorage.setItem("access_token", data.access_token);
+        localStorage.setItem("refresh_token", data.refresh_token);
+
+        errorDiv.textContent = "";
+        console.log("Вход выполнен успешно");
+        return true;
+
+    } catch (err) {
+        console.error("Login error:", err);
+        errorDiv.textContent = "Сервер недоступен";
+        return false;
+    }
+}
+
+async function registerUser(username, password) {
+    const errorDiv = document.getElementById("register-error");
+
+    try {
+        const res = await fetch("http://localhost:8000/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+            errorDiv.textContent = data.detail || "Ошибка регистрации";
+            return false;
+        }
+
+        errorDiv.textContent = "";
+        alert("Регистрация успешна. Теперь войдите.");
+        return true;
+
+    } catch (err) {
+        console.error("Register error:", err);
+        errorDiv.textContent = "Сервер недоступен";
+        return false;
+    }
+}
+
+async function logoutUser() {
+    const token = localStorage.getItem("access_token");
+
+    try {
+        await fetch("http://localhost:8000/logout", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+        });
+    } catch (e) {
+        console.warn("Logout failed silently");
+    }
+
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+
+    // Переключение UI
+    document.getElementById("requests-container").classList.add("d-none");
+    document.getElementById("profile-log-container").classList.remove("d-none");
+}
+
+// слушатели 
+document.getElementById("login-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const username = document.getElementById("login-username").value;
+    const password = document.getElementById("login-password").value;
+
+    const success = await loginUser(username, password);
+    if (success) {
+        // Показываем другой контейнер, например список запросов
+        document.getElementById("profile-log-container").classList.add("d-none");
+        document.getElementById("requests-container").classList.remove("d-none");
+    }
+});
+document.getElementById("register-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const username = document.getElementById("register-username").value;
+    const password = document.getElementById("register-password").value;
+
+    await registerUser(username, password);
+});
+document.getElementById("profile-log-nav").addEventListener("click", () => {
+    logoutUser();
+});
+
+// === Вся эта конструкция может и не работать)) == 
+// // При загрузке popup (в popup.js) проверить access_token через /me
+// async function checkAuth() {
+//     const token = localStorage.getItem("access_token");
+//     if (!token) {
+//         return false;
+//     }
+
+//     try {
+//         const res = await fetch("http://localhost:8000/me", {
+//             headers: {
+//                 Authorization: `Bearer ${token}`,
+//             },
+//         });
+
+//         if (!res.ok) {
+//             throw new Error("Токен не валиден");
+//         }
+
+//         const data = await res.json();
+//         console.log("Пользователь авторизован:", data.username);
+
+//         // Показываем интерфейс после логина
+//         document.getElementById("requests-container").classList.remove("d-none");
+//         document.getElementById("profile-log-container").classList.add("d-none");
+
+//         return true;
+
+//     } catch (e) {
+//         console.warn("Пользователь не авторизован");
+//         logoutUser(); // очистка токенов
+//         return false;
+//     }
+// }
+
+// document.addEventListener("DOMContentLoaded", async () => {
+//     await checkAuth();
+// });
 
 
 

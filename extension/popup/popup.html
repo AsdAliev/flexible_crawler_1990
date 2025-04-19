@@ -51,11 +51,36 @@
     </div>
 
     <div class="container main-page-content d-none" id="profile-log-container">
-        Логин
+        <!-- Логин -->
+        <form id="login-form">
+            <div class="mb-3">
+                <label for="login-username" class="form-label">Логин</label>
+                <input type="text" class="form-control" id="login-username" required>
+            </div>
+            <div class="mb-3">
+                <label for="login-password" class="form-label">Пароль</label>
+                <input type="password" class="form-control" id="login-password" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Войти</button>
+        </form>
+        <div id="login-error" class="text-danger mt-2"></div>             
     </div>
 
     <div class="container main-page-content d-none" id="profile-register-container">
-        Регистрация
+        <!-- Регистрация -->
+        <form id="register-form">
+            <div class="mb-3">
+                <label for="register-username" class="form-label">Логин</label>
+                <input type="text" class="form-control" id="register-username" required>
+            </div>
+            <div class="mb-3">
+                <label for="register-password" class="form-label">Пароль</label>
+                <input type="password" class="form-control" id="register-password" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Зарегистрироваться</button>
+        </form>
+        <div id="register-error" class="text-danger mt-2"></div>
+        
     </div>
 
     <div class="container main-page-content d-none" id="profile-change-pswd-container">
