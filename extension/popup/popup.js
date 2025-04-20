@@ -78,20 +78,33 @@ async function loginUser(username, password) {
         const data = await res.json();
 
         if (!res.ok) {
-            errorDiv.textContent = data.detail || "Ошибка входа";
+            //errorDiv.textContent = data.detail || "Ошибка входа";
+            errorDiv.textContent ="Ошибка входа";
+            errorDiv.classList.remove("text-success");
+            errorDiv.classList.add("text-danger");
+            setTimeout(() => {
+                errorDiv.textContent = "";
+            }, 3000);            
             return false;
         }
 
         localStorage.setItem("access_token", data.access_token);
         localStorage.setItem("refresh_token", data.refresh_token);
 
-        errorDiv.textContent = "";
-        console.log("Вход выполнен успешно");
+        errorDiv.textContent = "Успешный вход!";
+        errorDiv.classList.remove("text-danger");
+        errorDiv.classList.add("text-success");
+
         return true;
 
     } catch (err) {
+        setTimeout(() => {
+            errorDiv.textContent = "";
+        }, 3000);        
         console.error("Login error:", err);
         errorDiv.textContent = "Сервер недоступен";
+        errorDiv.classList.remove("text-success");
+        errorDiv.classList.add("text-danger");
         return false;
     }
 }
@@ -124,38 +137,151 @@ async function registerUser(username, password) {
     }
 }
 
-async function logoutUser() {
+// async function logoutUser() {
+//     const token = localStorage.getItem("access_token");
+
+//     try {
+//         await fetch("http://localhost:8000/logout", {
+//             method: "POST",
+//             headers: { Authorization: `Bearer ${token}` },
+//         });
+//     } catch (e) {
+//         console.warn("Logout failed silently");
+//     }
+
+//     localStorage.removeItem("access_token");
+//     localStorage.removeItem("refresh_token");
+
+//     // Переключение UI
+//     document.getElementById("requests-container").classList.add("d-none");
+//     document.getElementById("profile-log-container").classList.remove("d-none");
+// }
+
+async function changePassword(oldPassword, newPassword) {
+    const msgBox = document.getElementById("change-password-msg");
     const token = localStorage.getItem("access_token");
 
     try {
+        const res = await fetch("http://localhost:8000/change-password", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+                old_password: oldPassword,
+                new_password: newPassword
+            }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+            msgBox.textContent = data.detail || "Ошибка при смене пароля";
+            msgBox.className = "text-danger mt-2";
+            return false;
+        }
+
+        msgBox.textContent = "Пароль успешно изменён!";
+        msgBox.className = "text-success mt-2";
+        return true;
+
+    } catch (err) {
+        console.error("Change password error:", err);
+        msgBox.textContent = "Сервер недоступен";
+        msgBox.className = "text-danger mt-2";
+        return false;
+    }
+}
+
+async function logoutUser() {
+    const token = localStorage.getItem("access_token");
+
+    // Отзываем токен на сервере
+    try {
         await fetch("http://localhost:8000/logout", {
             method: "POST",
-            headers: { Authorization: `Bearer ${token}` },
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
         });
-    } catch (e) {
-        console.warn("Logout failed silently");
+    } catch (err) {
+        console.warn("Logout failed (не критично)");
     }
 
+    // Очищаем локальные токены СРАЗУ
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
 
-    // Переключение UI
+    document.getElementById("user-info").classList.add("d-none");
+    document.getElementById("current-username").textContent = "";    
+
+    // Переключаем интерфейс
     document.getElementById("requests-container").classList.add("d-none");
     document.getElementById("profile-log-container").classList.remove("d-none");
+
+    // очищаем сообщения
+    const msgBoxes = document.querySelectorAll(".text-danger, .text-success");
+    msgBoxes.forEach(div => div.textContent = "");
 }
 
-// слушатели 
+async function checkAuth() {
+    const token = localStorage.getItem("access_token");
+    const refreshToken = localStorage.getItem("refresh_token");
+    const usernameSpan = document.getElementById("current-username");
+    const userInfo = document.getElementById("user-info");
+
+    if (!token || !refreshToken) {
+        return false;
+    }
+
+    try {
+        const res = await fetch("http://localhost:8000/me", {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
+
+        if (!res.ok) throw new Error("Не авторизован");
+
+        const data = await res.json();
+        usernameSpan.textContent = data.username;
+        userInfo.classList.remove("d-none"); // Показываем
+        return true;
+
+    } catch (e) {
+        console.warn("Не авторизован");
+        logoutUser();
+        return false;
+    }
+}
+
+// === слушатели ===
+document.addEventListener("DOMContentLoaded", async () => {
+    const authenticated = await checkAuth();
+
+    if (authenticated) {
+        // Например, сразу показать requests или что-то ещё
+        document.getElementById("requests-container").classList.remove("d-none");
+        document.getElementById("profile-log-container").classList.add("d-none");
+    } else {
+        // Не авторизован — показать логин
+        document.getElementById("profile-log-container").classList.remove("d-none");
+        document.getElementById("requests-container").classList.add("d-none");
+    }
+});
+
 document.getElementById("login-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const username = document.getElementById("login-username").value;
     const password = document.getElementById("login-password").value;
 
     const success = await loginUser(username, password);
-    if (success) {
-        // Показываем другой контейнер, например список запросов
-        document.getElementById("profile-log-container").classList.add("d-none");
-        document.getElementById("requests-container").classList.remove("d-none");
-    }
+    // if (success) {
+    //     // Показываем другой контейнер, например список запросов
+    //     document.getElementById("profile-log-container").classList.add("d-none");
+    //     document.getElementById("requests-container").classList.remove("d-none");
+    // }
 });
 document.getElementById("register-form").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -164,7 +290,16 @@ document.getElementById("register-form").addEventListener("submit", async (e) =>
 
     await registerUser(username, password);
 });
-document.getElementById("profile-log-nav").addEventListener("click", () => {
+// document.getElementById("profile-log-nav").addEventListener("click", () => {
+//     logoutUser();
+// });
+document.getElementById("change-password-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const oldPassword = document.getElementById("old-password").value;
+    const newPassword = document.getElementById("new-password").value;
+    await changePassword(oldPassword, newPassword);
+});
+document.getElementById("logout-button").addEventListener("click", () => {
     logoutUser();
 });
 

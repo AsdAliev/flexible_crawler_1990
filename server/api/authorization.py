@@ -2,6 +2,10 @@ from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import sqlite3, bcrypt, jwt
 from datetime import datetime, timedelta
+from fastapi import APIRouter
+
+router = APIRouter()
+
 
 # === Константы ===
 SECRET_KEY = "my_very_secret_key"
@@ -75,7 +79,7 @@ def verify_token(token: str, expected_type="access"):
 
 # === Эндпоинты ===
 
-@app.post("/register")
+@router.post("/register")
 def register(data: dict):
     username = data.get("username")
     password = data.get("password")
@@ -94,7 +98,7 @@ def register(data: dict):
     except sqlite3.IntegrityError:
         raise HTTPException(status_code=400, detail="Username already exists")
 
-@app.post("/login")
+@router.post("/login")
 def login(data: dict):
     username = data.get("username")
     password = data.get("password")
@@ -133,7 +137,7 @@ def login(data: dict):
         "refresh_token": refresh_token
     }
 
-@app.post("/refresh")
+@router.post("/refresh")
 def refresh_token(data: dict):
     token = data.get("refresh_token")
     if not token:
@@ -188,7 +192,7 @@ def refresh_token(data: dict):
         "refresh_token": new_refresh_token
     }
 
-@app.get("/me")
+@router.get("/me")
 def get_me(credentials: HTTPAuthorizationCredentials = Depends(security)):
     user_id = verify_token(credentials.credentials)
     
@@ -203,7 +207,7 @@ def get_me(credentials: HTTPAuthorizationCredentials = Depends(security)):
     
     return {"id": result[0], "username": result[1], "created_at": result[2]}
 
-@app.post("/logout")
+@router.post("/logout")
 def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
     token = credentials.credentials
     user_id = verify_token(token)
@@ -217,6 +221,35 @@ def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
     conn.close()
 
     return {"message": "Token revoked and refresh token removed"}
+
+@router.post("/change-password")
+def change_password(data: dict, credentials: HTTPAuthorizationCredentials = Depends(security)):
+    user_id = verify_token(credentials.credentials)
+    old_password = data.get("old_password")
+    new_password = data.get("new_password")
+
+    if not old_password or not new_password:
+        raise HTTPException(status_code=400, detail="Both old and new passwords required")
+
+    conn = sqlite3.connect("users.db")
+    c = conn.cursor()
+    c.execute("SELECT password_hash FROM users WHERE id = ?", (user_id,))
+    user = c.fetchone()
+
+    if not user or not bcrypt.checkpw(old_password.encode(), user[0]):
+        conn.close()
+        raise HTTPException(status_code=401, detail="Incorrect old password")
+
+    new_hash = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt())
+    c.execute("UPDATE users SET password_hash = ? WHERE id = ?", (new_hash, user_id))
+    conn.commit()
+    conn.close()
+
+    return {"message": "Password changed successfully"}
+
+
+# экспорт роутера
+__all__ = ["router"]
 
 # === Очистка просроченых токенов === [реализована в /refresh]
 # Фоновая периодическая задача

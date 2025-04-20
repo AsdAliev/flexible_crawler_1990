@@ -37,11 +37,16 @@
                             <li><a id="profile-change-pswd-nav" class="dropdown-item" href="#">Сменить пароль</a></li>
                         </ul>
                     </li>
+                    <!-- Выйти -->
+                    <button id="logout-button" class="btn btn-outline-danger btn-sm">Выйти</button>
                 </ul>
             </div>
         </div>
     </nav>
 
+    <div id="user-info" class="text-end text-muted small d-none">
+        Вы вошли как <span id="current-username">...</span>
+    </div>    
     <div class="container main-page-content d-none" id="requests-container">
         Список реквестов
     </div>
@@ -84,7 +89,19 @@
     </div>
 
     <div class="container main-page-content d-none" id="profile-change-pswd-container">
-        Смена пароля
+        <!-- Смена пароля -->
+        <form id="change-password-form">
+            <div class="mb-3">
+                <label for="old-password" class="form-label">Старый пароль</label>
+                <input type="password" class="form-control" id="old-password" required>
+            </div>
+            <div class="mb-3">
+                <label for="new-password" class="form-label">Новый пароль</label>
+                <input type="password" class="form-control" id="new-password" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Сменить пароль</button>
+        </form>
+        <div id="change-password-msg" class="mt-2"></div>        
     </div>
 
     <!-- <div id="tabs">

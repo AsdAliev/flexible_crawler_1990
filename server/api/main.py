@@ -15,11 +15,26 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from models import CrawlerRequest
 
+from fastapi.middleware.cors import CORSMiddleware
+from authorization import router as auth_router 
+
 app = FastAPI(
     title="Flexible Crawler API",
     description="API для запуска гибкого краулера на базе Scrapy",
     version="1.2.0"
 )
+
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # лучше явно указывать допустимые origin (фронтенд, расширение, и т.д.)
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Подключаем маршруты из auth.py
+app.include_router(auth_router)
 
 # Создание папок для промежуточных результатов
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), "results")
