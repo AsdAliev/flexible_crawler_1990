@@ -99,7 +99,7 @@ export async function getAllRequests() {
 export async function getRecentRequests(n = 0) {
     const all = await getAllRequests();
     if (!n) {
-        return all;
+        return all.sort((a, b) => b.createdAt - a.createdAt);
     } else {
         return all
             .sort((a, b) => b.createdAt - a.createdAt)
