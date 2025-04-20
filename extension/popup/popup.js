@@ -110,6 +110,7 @@ function createRequestCard(request) {
                         card.querySelector('span').classList.add('text-bg-success');
                         card.querySelector('span').textContent = 'Готово';
                         card.querySelector('a').onclick = () => { getResult(request.id, "json") };
+                        clearInterval(intId);
                     } else {
                         console.log('Статус не получен (возможно, неверный ID).');
                     }
