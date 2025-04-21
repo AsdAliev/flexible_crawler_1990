@@ -112,7 +112,6 @@ export class CrawlerRequest {
      */
     async sendParsingTask() {
         const apiUrl = 'http://localhost:8000/start_crawler';
-        let ans = undefined;
         try {
             const response = await fetch(apiUrl, {
                 method: "POST",
@@ -124,17 +123,29 @@ export class CrawlerRequest {
                     crawler_settings: this.crawler_settings,
                     meta: this.meta
                 })
-            })
-            if (!response.ok) {
-                throw new Error(`Error HTTP: ${response.status}`);
-            }
-            ans = await response.json()
-        } catch (error) {
-            console.error('Error:', error);
-        }
+            });
 
-        return ans;
+            if (!response.ok) {
+                let errorMessage = `HTTP error: ${response.status}`;
+                try {
+                    const errorData = await response.json(); // Пытаемся получить JSON
+                    errorMessage += `\n${JSON.stringify(errorData, null, 2)}`;
+                } catch {
+                    const errorText = await response.text(); // Если не JSON, то как текст
+                    errorMessage += `\n${errorText}`;
+                }
+
+                const error = new Error(errorMessage);
+                error.status = response.status;
+                throw error;
+            }
+
+            return await response.json()
+        } catch (error) {
+            throw error;
+        }
     }
+
     toJSON() {
         return {
             start_url: this.start_url,
@@ -142,6 +153,7 @@ export class CrawlerRequest {
             meta: this.meta
         };
     }
+
     toString() {
         return JSON.stringify({
             start_url: this.start_url,

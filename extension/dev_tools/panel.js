@@ -3,25 +3,45 @@ import {
     PathData, Attribute, ObjectMeta,
     PaginationSettings, CrawlerSettings, CrawlerRequest
 } from "./api-classes.js";
+import * as requestDB from '../storage/request-storage.js';
 
-// add listener to get path for parse elements
 chrome.devtools.panels.elements.onSelectionChanged.addListener(() => {
+    const { type: pathType, input, isRel } = FormHelper.prevPath;
+    const buildPath = pathType.value === "xpath" ? getXPath : getCssSelector;
+
     chrome.devtools.inspectedWindow.eval(
-        `(${getCssSelector.toString()})(inspect($0))`,
-        (cssResult, isCssException) => {
-            if (isCssException) {
-                console.error("Error: Unable to compute the CSS Selector.");
+        `(${buildPath.toString()})(inspect($0), ${JSON.stringify(isRel)})`,
+        (pathResult, exception) => {
+            if (exception) {
+                console.error(`Error generating ${pathType.value.toUpperCase()} selector:`, exception);
             } else {
-                console.log(cssResult);
+                input.value = pathResult;
             }
         }
     );
 });
 
+document.getElementById('request-name-input').addEventListener('focus',
+    /**
+    * убрать фокус с путей
+    */
+    () => {
+        FormHelper.prevPath.input?.classList.remove('border-primary');
+        FormHelper.prevPath.input = null;
+        FormHelper.prevPath.type = null;
+        FormHelper.prevPath.isRel = null;
+    }
+);
+
 const parseForm = document.getElementById('parse-form');
 const FormHelper = {
     objectCounter: 0,
     attributeCounter: 0,
+    prevPath: {
+        input: null,
+        type: null,
+        isRel: null
+    },
     /**
      * 
      * @param {HTMLElement} form 
@@ -44,7 +64,7 @@ const FormHelper = {
         nameContainer.appendChild(span);
         nameContainer.appendChild(name);
 
-        const path = FormHelper.createPathInput(object.id);
+        const path = FormHelper.createPathInput(object.id, false);
         object.appendChild(nameContainer)
         object.appendChild(path)
 
@@ -67,7 +87,7 @@ const FormHelper = {
 
         return object;
     },
-    createPathInput: (parentId) => {
+    createPathInput: (parentId, isRel = true) => {
         const path = document.createElement('div');
         path.classList.add('mb-3');
         path.innerHTML = `
@@ -83,6 +103,17 @@ const FormHelper = {
                 <label>Путь</label>
             </div> 
         `;
+
+        const input = path.querySelector('input');
+        const pathType = path.querySelector('select');
+        input.addEventListener('focus', () => {
+            FormHelper.prevPath.input?.classList.remove('border-primary');
+            FormHelper.prevPath.input = input;
+            FormHelper.prevPath.input.classList.add('border-primary');
+            FormHelper.prevPath.type = pathType;
+            const isRelLoc = isRel;
+            FormHelper.prevPath.isRel = isRelLoc;
+        });
         return path;
     },
     createAttribute: (parentId, islinked = false) => {
@@ -184,13 +215,51 @@ parseForm.addEventListener('submit', (e) => {
 })
 
 async function sendParseRequest() {
-    const start_url = (await chrome.runtime.sendMessage({ action: "getActiveTab" }))?.url; // TODO
-    const objectMeta = getRequestMeta();
-    const parse_settings = getParseSettings();
-    const req = new CrawlerRequest(start_url, parse_settings, objectMeta);
-    console.log(req.toJSON());
-    req.sendParsingTask();
+    try {
+        const start_url = (await chrome.runtime.sendMessage({ action: "getActiveTab" }))?.url; // TODO
+        const objectMeta = getRequestMeta();
+        const parse_settings = getParseSettings();
+
+        const req = new CrawlerRequest(start_url, parse_settings, objectMeta);
+        console.log(req.toJSON());
+
+        const answer = await req.sendParsingTask();
+        const reqId = answer.task_id;
+        const reqStatus = answer.status;
+
+        requestDB.addRequest({
+            id: reqId,
+            status: reqStatus,
+            name: document.getElementById('request-name-input').value.trim(),
+            request: req
+        });
+
+        showModal(answer);
+    }
+    catch (error) {
+        console.log(error);
+        showModal(error, false);
+    }
 }
+
+function showModal(msg, isOk = true) {
+    const modalBtn = document.getElementById("openModalBtn");
+    modalBtn.click();
+    if (isOk) {
+        document.getElementById('staticBackdropLabel').textContent = "Запрос принят сервером"
+        document.getElementById('modalBody__container').textContent = JSON.stringify(msg, null, 2);
+    } else {
+        document.getElementById('staticBackdropLabel').textContent = "Ошибка"
+        document.getElementById('modalBody__container').textContent = `${msg.message}`;
+    }
+}
+
+document.getElementById('clear-form-btn').addEventListener('click', () => {
+    let elems = parseForm.querySelectorAll('.parse-object, .parse-attribute')
+    for (let i of elems) {
+        i.remove();
+    }
+});
 
 function setupParseSettings() {
     const enablePagination = document.getElementById('enable-pagination');
