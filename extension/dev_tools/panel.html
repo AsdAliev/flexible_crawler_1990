@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html data-bs-theme="auto">
+
+<head>
+    <title>CSS Selector & XPath</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="../styles/devtools-panel-styles.css" rel="stylesheet" />
+    <link href="../styles/bootstrap.min.css" rel="stylesheet" />
+</head>
+
+<body class="container py-4">
+    <h1 class="mb-4">Создание запроса</h1>
+    <!-- Мета запроса -->
+    <div id="parse-settings" class="mb-4">
+        <div id="parse-request-name" class="mb-3">
+            <label for="request-name-input" class="form-label">Имя запроса</label>
+            <input id="request-name-input" type="text" class="form-control">
+        </div>
+        <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="enable-pagination">
+            <label class="form-check-label" for="enable-pagination">
+                Пагинация
+            </label>
+        </div>
+        <div id="pagination-settings" class="border p-3 rounded mb-4" style="display: none;">
+            <div class="form-floating mb-3">
+                <select id="pagination-type" class="form-select">
+                    <option selected value="0">Следующая страница</option>
+                    <option value="1">URL параметр</option>
+                </select>
+                <label for="pagination-type">Тип пагинации</label>
+            </div>
+
+            <div class="form-floating mb-3">
+                <input id="pagination-max-number-of-pages" type="text" class="form-control" value="10" placeholder="10">
+                <label for="pagination-max-number-of-pages">Количество страниц</label>
+            </div>
+
+            <div id="next-pagination-elem" class="mb-3">
+                <div class="form-floating mb-2">
+                    <select id="pagination-path-type" class="form-select">
+                        <option selected>xpath</option>
+                        <option>css</option>
+                    </select>
+                    <label for="pagination-path-type">Тип пути</label>
+                </div>
+                <div class="form-floating">
+                    <input id="next-pagination-elem-path" type="text" class="form-control" placeholder="/">
+                    <label for="next-pagination-elem-path">Путь</label>
+                </div>
+            </div>
+            <div id="pagination-query-param" style="display: none;">
+                <div class="form-floating mb-2">
+                    <input id="pagination-query-param-input" type="text" class="form-control"
+                        placeholder="start_id={id}">
+                    <label for="pagination-query-param-input">Параметр номера страницы</label>
+                </div>
+                <div class="form-floating">
+                    <input id="pagination-query-param-increment" type="text" class="form-control" value="1"
+                        placeholder="1">
+                    <label for="pagination-query-param-increment">Увеличение параметра</label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Форма структуры запроса -->
+    <form action="" id="parse-form">
+        <div class="d-flex gap-2" id="init-form-buttons">
+            <button id="add-object-button" type="button" class="btn btn-secondary">Добавить объект</button>
+            <button id="form-submit" type="submit" class="btn btn-primary">Отправить запрос</button>
+        </div>
+    </form>
+
+    <!-- Для открытия modal -->
+    <button id="openModalBtn" type="button" class="btn btn-primary invisible" data-bs-toggle="modal"
+        data-bs-target="#staticBackdrop">
+        Launch static backdrop modal
+    </button>
+    <!-- Попап с сообщением об отправке запроса -->
+    <div class="modal fade" id="staticBackdrop" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1"
+        aria-labelledby="staticBackdropLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h1 class="modal-title fs-5" id="staticBackdropLabel">Запрос успешно отправлен</h1>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="modalBody">
+                    <pre id="modalBody__container"></pre>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                    <button id="clear-form-btn" type="button" class="btn btn-primary">Очистить форму</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="panel.js" type="module"></script>
+    <script src="../styles/bootstrap.bundle.min.js"></script>
+    <script src="../styles/light-dark-switcher.js"></script>
+</body>
+
+</html>
