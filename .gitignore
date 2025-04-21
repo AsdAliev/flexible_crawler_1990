@@ -16,6 +16,7 @@ coverage.xml
 __pycache__/
 
 *.xml
+*.db
 *.csv
 api.js
 test.py
