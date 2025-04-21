@@ -1,0 +1,51 @@
+{
+    "start_url": "https://www.findbook.ru/search/d1?title=451+градус+по+фаренгейту&r=0&s=1&viewsize=15&startidx=15",
+    "crawler_settings": {
+        "request_delay": 2,
+        "pagination": {
+            "enabled": true,
+            "url_param_template": "startidx={page_number}",
+            "max_pages": 3,
+            "page_increment": 15
+        }
+    },
+    "meta": [
+        {
+            "object_name": "book",
+            "object_caption": "Книга",
+            "object_selector": {
+                "path": "//div[contains(@class, 'row results__line')]",
+                "selector_type": "xpath"
+            },
+            "attributes": [
+                {
+                    "attribute_name": "store_name",
+                    "attribute_caption": "Название магазина",
+                    "attribute_selector": {
+                        "path": ".//div[@class='results__shop-name']/a/text()",
+                        "selector_type": "xpath"
+                    },
+                    "attribute_type": "simple"
+                },
+                {
+                    "attribute_name": "isbn",
+                    "attribute_caption": "ISBN",
+                    "attribute_selector": {
+                        "path": ".//div[@class='results__isbn-item']/a/text()",
+                        "selector_type": "xpath"
+                    },
+                    "attribute_type": "simple"
+                },
+                {
+                    "attribute_name": "price",
+                    "attribute_caption": "Стоимость",
+                    "attribute_selector": {
+                        "path": ".//div[contains(@class, 'results__price')]/a/text()",
+                        "selector_type": "xpath"
+                    },
+                    "attribute_type": "simple"
+                }
+            ]
+        }
+    ]
+}

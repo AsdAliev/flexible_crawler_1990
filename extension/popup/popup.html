@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="auto">
+
+<head>
+    <title>Popup</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="../styles/popup-styles.css">
+    <link href="../styles/bootstrap.min.css" rel="stylesheet" />
+</head>
+
+<body>
+
+    <nav class="navbar navbar-expand bg-body-tertiary sticky-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">Парсер <img src="../icons/16_image.png" alt=""></a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNavDropdown"
+                aria-controls="navbarNavDropdown" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNavDropdown">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a id="request-nav" class="nav-link active" href="#">Запросы</a>
+                    </li>
+                    <li class="nav-item">
+                        <a id="settings-nav" class="nav-link" href="#">Настройки</a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a id="profile-nav" class="nav-link dropdown-toggle" href="#" role="button"
+                            data-bs-toggle="dropdown" aria-expanded="false">
+                            Профиль
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a id="profile-log-nav" class="dropdown-item" href="#">Войти/Выйти</a></li>
+                            <li><a id="profile-registration-nav" class="dropdown-item" href="#">Регистрация</a></li>
+                            <li><a id="profile-change-pswd-nav" class="dropdown-item" href="#">Сменить пароль</a></li>
+                        </ul>
+                    </li>
+                    <!-- Выйти -->
+                    <button id="logout-button" class="btn btn-outline-danger btn-sm">Выйти</button>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div id="user-info" class="text-end text-muted small d-none">
+        Вы вошли как <span id="current-username">...</span>
+    </div>    
+    <div class="container main-page-content mt-2 pb-2 d-none" id="requests-container">
+        <ol class="list-group list-group-numbered" id="requests-container__list"></ol>
+    </div>
+
+    <div class="container main-page-content d-none" id="settings-container">
+        Настройки
+    </div>
+
+    <div class="container main-page-content d-none" id="profile-log-container">
+        <!-- Логин -->
+        <form id="login-form">
+            <div class="mb-3">
+                <label for="login-username" class="form-label">Логин</label>
+                <input type="text" class="form-control" id="login-username" required>
+            </div>
+            <div class="mb-3">
+                <label for="login-password" class="form-label">Пароль</label>
+                <input type="password" class="form-control" id="login-password" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Войти</button>
+        </form>
+        <div id="login-error" class="text-danger mt-2"></div>             
+    </div>
+
+    <div class="container main-page-content d-none" id="profile-register-container">
+        <!-- Регистрация -->
+        <form id="register-form">
+            <div class="mb-3">
+                <label for="register-username" class="form-label">Логин</label>
+                <input type="text" class="form-control" id="register-username" required>
+            </div>
+            <div class="mb-3">
+                <label for="register-password" class="form-label">Пароль</label>
+                <input type="password" class="form-control" id="register-password" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Зарегистрироваться</button>
+        </form>
+        <div id="register-error" class="text-danger mt-2"></div>
+        
+    </div>
+
+    <div class="container main-page-content d-none" id="profile-change-pswd-container">
+        <!-- Смена пароля -->
+        <form id="change-password-form">
+            <div class="mb-3">
+                <label for="old-password" class="form-label">Старый пароль</label>
+                <input type="password" class="form-control" id="old-password" required>
+            </div>
+            <div class="mb-3">
+                <label for="new-password" class="form-label">Новый пароль</label>
+                <input type="password" class="form-control" id="new-password" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Сменить пароль</button>
+        </form>
+        <div id="change-password-msg" class="mt-2"></div>        
+    </div>
+
+    <!-- <div id="tabs">
+        <button id="requestsTabButton" class="tab-button active">Requests</button>
+    </div>
+
+    <div id="requestsSection" class="tab-content active">
+        <table id="requestsTable">
+            <thead>
+                <tr>
+                    <th>Request ID</th>
+                    <th>URL</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="requestsTableBody">
+            </tbody>
+        </table>
+
+        <div id="fileDownloadSection" class="download-section">
+            <label for="fileFormatSelect">File Format:</label>
+            <select id="fileFormatSelect">
+                <option value="json">JSON</option>
+                <option value="csv">CSV</option>
+                <option value="xml">XML</option>
+            </select>
+            <button id="downloadButton" class="download-btn">Download Results</button>
+        </div>
+    </div> -->
+
+    <script type="module" src="popup.js"></script>
+    <script src="../styles/bootstrap.bundle.min.js"></script>
+    <script src="../styles/light-dark-switcher.js"></script>
+</body>
+
+</html>
