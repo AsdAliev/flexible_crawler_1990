@@ -32,21 +32,16 @@
                             Профиль
                         </a>
                         <ul class="dropdown-menu">
-                            <li><a id="profile-log-nav" class="dropdown-item" href="#">Войти/Выйти</a></li>
+                            <li><a id="profile-log-nav" class="dropdown-item" href="#">Войти</a></li>
                             <li><a id="profile-registration-nav" class="dropdown-item" href="#">Регистрация</a></li>
                             <li><a id="profile-change-pswd-nav" class="dropdown-item" href="#">Сменить пароль</a></li>
                         </ul>
                     </li>
-                    <!-- Выйти -->
-                    <button id="logout-button" class="btn btn-outline-danger btn-sm">Выйти</button>
                 </ul>
             </div>
         </div>
     </nav>
 
-    <div id="user-info" class="text-end text-muted small d-none">
-        Вы вошли как <span id="current-username">...</span>
-    </div>    
     <div class="container main-page-content mt-2 pb-2 d-none" id="requests-container">
         <ol class="list-group list-group-numbered" id="requests-container__list"></ol>
     </div>
@@ -68,7 +63,7 @@
             </div>
             <button type="submit" class="btn btn-primary">Войти</button>
         </form>
-        <div id="login-error" class="text-danger mt-2"></div>             
+        <div id="login-error" class="text-danger mt-2"></div>
     </div>
 
     <div class="container main-page-content d-none" id="profile-register-container">
@@ -85,7 +80,7 @@
             <button type="submit" class="btn btn-primary">Зарегистрироваться</button>
         </form>
         <div id="register-error" class="text-danger mt-2"></div>
-        
+
     </div>
 
     <div class="container main-page-content d-none" id="profile-change-pswd-container">
@@ -101,36 +96,8 @@
             </div>
             <button type="submit" class="btn btn-primary">Сменить пароль</button>
         </form>
-        <div id="change-password-msg" class="mt-2"></div>        
+        <div id="change-password-msg" class="mt-2"></div>
     </div>
-
-    <!-- <div id="tabs">
-        <button id="requestsTabButton" class="tab-button active">Requests</button>
-    </div>
-
-    <div id="requestsSection" class="tab-content active">
-        <table id="requestsTable">
-            <thead>
-                <tr>
-                    <th>Request ID</th>
-                    <th>URL</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody id="requestsTableBody">
-            </tbody>
-        </table>
-
-        <div id="fileDownloadSection" class="download-section">
-            <label for="fileFormatSelect">File Format:</label>
-            <select id="fileFormatSelect">
-                <option value="json">JSON</option>
-                <option value="csv">CSV</option>
-                <option value="xml">XML</option>
-            </select>
-            <button id="downloadButton" class="download-btn">Download Results</button>
-        </div>
-    </div> -->
 
     <script type="module" src="popup.js"></script>
     <script src="../styles/bootstrap.bundle.min.js"></script>
