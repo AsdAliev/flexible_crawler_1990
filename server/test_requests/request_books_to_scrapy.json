@@ -9,7 +9,7 @@
                 "path": "//li[@class='next']/a",
                 "selector_type": "xpath"
             },
-            "max_pages": 10
+            "max_pages": 2
         }
     },
     "meta": [
