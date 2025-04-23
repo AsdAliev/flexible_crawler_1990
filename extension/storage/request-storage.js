@@ -76,6 +76,26 @@ export async function deleteRequest(id) {
 }
 
 /**
+ * Получить запись по id
+ * @param {string} id
+ * @returns {Promise<{id: string, status: string, request: object, createdAt: number} | undefined>}
+ */
+export async function getRequestById(id) {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.get(id);
+        req.onsuccess = () => {
+            // вернёт undefined, если записи нет
+            resolve(req.result);
+        };
+        req.onerror = e => reject(e.target.error);
+    });
+}
+
+
+/**
  * Получить все записи истории
  * @returns {Promise<Array<{id: string, status: string, request: object}>>}
  */
