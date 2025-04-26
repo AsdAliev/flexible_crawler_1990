@@ -47,7 +47,23 @@
     </div>
 
     <div class="container main-page-content d-none" id="settings-container">
-        Настройки
+        <form id="settings-form">
+            <div class="mb-3">
+                <label for="server-url-input" class="form-label">Адрес сервера</label>
+                <input type="text" class="form-control" id="server-url-input" aria-describedby="server-url-help">
+                <div id="server-url-help" class="form-text">Адрес краулера, к которому будет обращаться расширение.
+                </div>
+            </div>
+            <div class="mb-3">
+                <select id="download-file-type" class="form-select" aria-label="download file type">
+                    <option value="json" selected>json</option>
+                    <option value="csv">csv</option>
+                    <option value="xml">xml</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">Сохранить</button>
+            <button id="revert-settings" class="btn btn-secondary">Отмена</button>
+        </form>
     </div>
 
     <div class="container main-page-content d-none" id="profile-log-container">
