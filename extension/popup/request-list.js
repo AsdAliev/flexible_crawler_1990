@@ -1,5 +1,6 @@
 import * as requestDB from '../storage/request-storage.js';
 import { CrawlerRequest } from '../dev_tools/api-classes.js';
+import { appSettings } from '../app-settings.js';
 
 export async function fillRequestList() {
     const reqList = document.getElementById('requests-container__list');
@@ -80,7 +81,7 @@ function createRequestCard(request) {
         }
     });
     cardLinks[2].addEventListener('click', () => {
-        getResult(request.id, "json", request.name);
+        getResult(request.id, appSettings.downloadType, request.name);
     });
     cardLinks[3].addEventListener('click', () => {
         requestDB.deleteRequest(request.id);
@@ -107,7 +108,7 @@ function createRequestCard(request) {
                         card.querySelector('span').classList.remove('text-bg-warning');
                         card.querySelector('span').classList.add('text-bg-success');
                         card.querySelector('span').textContent = 'Готово';
-                        card.querySelector('a').onclick = () => { getResult(request.id, "json", request.name) };
+                        card.querySelector('a').onclick = () => { getResult(request.id, appSettings.downloadType, request.name) };
                         card.querySelectorAll('button.dropdown-item').forEach((x) => { x.disabled = false; })
                         clearInterval(intId);
                         intId = null;
@@ -118,7 +119,7 @@ function createRequestCard(request) {
         }, 2000);
     }
     if (request.status == 'completed') {
-        card.querySelector('a').onclick = () => { getResult(request.id, "json", request.name); };
+        card.querySelector('a').onclick = () => { getResult(request.id, appSettings.downloadType, request.name); };
     }
     return card;
 }
@@ -130,7 +131,7 @@ function createRequestCard(request) {
  * @returns {Promise<'in progress'|'completed'|null>} — статус задачи или null, если задача не найдена
  */
 async function getStatus(taskId) {
-    const url = `http://localhost:8000/status/${encodeURIComponent(taskId)}`;
+    const url = appSettings.serverDomain + `status/${encodeURIComponent(taskId)}`;
 
     try {
         const response = await fetch(url);
@@ -167,7 +168,7 @@ async function getStatus(taskId) {
  * @param {'json'|'csv'|'xml'} format — желаемый формат выходного файла
  */
 async function getResult(taskId, format, name = null) {
-    const url = `http://localhost:8000/result/${encodeURIComponent(taskId)}?output_format=${encodeURIComponent(format)}`;
+    const url = appSettings.serverDomain + `result/${encodeURIComponent(taskId)}?output_format=${encodeURIComponent(format)}`;
 
     try {
         const response = await fetch(url);
