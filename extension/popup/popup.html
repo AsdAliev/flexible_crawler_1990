@@ -47,14 +47,14 @@
     </div>
 
     <div class="container main-page-content d-none" id="settings-container">
-        <form id="settings-form">
-            <div class="mb-3">
+        <!-- Настройки -->
+        <form id="settings-form__basic" class="my-3 border rounded p-3">
+            <div class="mb-1">
                 <label for="server-url-input" class="form-label">Адрес сервера</label>
-                <input type="text" class="form-control" id="server-url-input" aria-describedby="server-url-help">
-                <div id="server-url-help" class="form-text">Адрес краулера, к которому будет обращаться расширение.
-                </div>
+                <input type="text" class="form-control" id="server-url-input">
             </div>
             <div class="mb-3">
+                <label for="server-url-input" class="form-label">Формат ответа</label>
                 <select id="download-file-type" class="form-select" aria-label="download file type">
                     <option value="json" selected>json</option>
                     <option value="csv">csv</option>
@@ -62,8 +62,15 @@
                 </select>
             </div>
             <button type="submit" class="btn btn-primary">Сохранить</button>
-            <button id="revert-settings" class="btn btn-secondary">Отмена</button>
+            <button id="revert-settings-basic" class="btn btn-secondary">Отмена</button>
         </form>
+        <div class="d-grid gap-2 mb-2">
+            <button id="export-history-btn" class="btn btn-outline-primary">Экспорт истории</button>
+            <input type="file" id="import-history-input" accept=".json" class="form-control" />
+            <button id="import-history-btn" class="btn btn-outline-secondary">Импортировать историю</button>
+            <button id="clear-history-btn" class="btn btn-outline-danger">Удалить всю историю</button>
+        </div>
+        <div id="history-message" class="mt-2 text-success"></div>
     </div>
 
     <div class="container main-page-content d-none" id="profile-log-container">
