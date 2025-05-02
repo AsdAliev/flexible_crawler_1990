@@ -1,6 +1,7 @@
 // popup.js
 import { fillRequestList } from "./request-list.js";
 import * as User from "./user.js"
+import { initSettingsForm } from "./settings-page.js";
 initPopup();
 
 function initPopup() {
@@ -87,6 +88,7 @@ function activateRequestPage() {
 function activateSettingsPage() {
     setActiveNavLink('settings-nav');
     setActiveMainPage('settings-container');
+    initSettingsForm();
 }
 
 async function activateProfileLoginPage() {
