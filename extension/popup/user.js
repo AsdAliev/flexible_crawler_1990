@@ -1,3 +1,5 @@
+import { appSettings } from '../app-settings.js';
+
 export let isAuthenticated = false;
 export let Name = null;
 
@@ -12,7 +14,7 @@ export async function checkAuth() {
     }
 
     try {
-        const res = await fetch("http://localhost:8000/me", {
+        const res = await fetch(appSettings.serverDomain + "me", {
             headers: {
                 Authorization: `Bearer ${token}`,
             },
@@ -36,7 +38,7 @@ export async function checkAuth() {
 export async function loginUser(username, password) {
     const errorDiv = document.getElementById("login-error");
     try {
-        const res = await fetch("http://localhost:8000/login", {
+        const res = await fetch(appSettings.serverDomain + "login", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ username, password }),
@@ -71,7 +73,7 @@ export async function registerUser(username, password) {
     const errorDiv = document.getElementById("register-error");
 
     try {
-        const res = await fetch("http://localhost:8000/register", {
+        const res = await fetch(appSettings.serverDomain + "register", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ username, password }),
@@ -109,7 +111,7 @@ export async function changePassword(oldPassword, newPassword) {
     const token = localStorage.getItem("access_token");
 
     try {
-        const res = await fetch("http://localhost:8000/change-password", {
+        const res = await fetch(appSettings.serverDomain + "change-password", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -155,7 +157,7 @@ export async function logoutUser() {
 
     // Отзываем токен на сервере
     try {
-        await fetch("http://localhost:8000/logout", {
+        await fetch(appSettings.serverDomain + "logout", {
             method: "POST",
             headers: {
                 Authorization: `Bearer ${token}`,
