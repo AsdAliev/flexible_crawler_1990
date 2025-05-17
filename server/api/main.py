@@ -4,6 +4,7 @@ import uuid
 import json
 import csv
 import xml.etree.ElementTree as ET
+import xml.dom.minidom as minidom
 
 from threading import Lock
 from typing import Literal
@@ -14,6 +15,7 @@ from fastapi import FastAPI, BackgroundTasks
 from fastapi.responses import FileResponse, JSONResponse
 
 from models import CrawlerRequest
+from utils import dict_to_xml
 
 from fastapi.middleware.cors import CORSMiddleware
 from authorization import router as auth_router 
@@ -241,11 +243,15 @@ def get_result(task_id: str, output_format: Literal["json", "csv", "xml"] = "jso
         root = ET.Element("items")
         for item in items:
             item_element = ET.SubElement(root, "item")
-            for key, value in item.items():
-                child = ET.SubElement(item_element, key.replace(" ", "_"))
-                child.text = str(value).replace("\xa0", " ")
-        tree = ET.ElementTree(root)
-        tree.write(output_path, encoding="utf-8", xml_declaration=True)
+            dict_to_xml(item_element, item)
+
+        # Преобразуем в строку и делаем pretty print
+        rough_string = ET.tostring(root, encoding="utf-8")
+        reparsed = minidom.parseString(rough_string)
+        pretty_xml = reparsed.toprettyxml(indent="    ", encoding="utf-8")
+
+        with open(output_path, "wb") as f:
+            f.write(pretty_xml)
 
         return FileResponse(
             path=output_path,

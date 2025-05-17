@@ -56,7 +56,10 @@ class FlexibleSpider(scrapy.Spider):
         # Для типа "link" возвращаем просто URL, а обработку ссылок оставляем в основном цикле
         elif attr_type == "link":
             if sub_elements:
-                return sub_elements[0].attrib.get("href")
+                try:
+                    return sub_elements[0].attrib.get("href")
+                except:
+                    return sub_elements.get("href")
 
         else:
             return None
