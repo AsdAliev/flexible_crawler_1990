@@ -37,7 +37,7 @@ class FlexibleSpider(scrapy.Spider):
             nested_result = {}
             for nested_attr in attr.get("nested_attributes", []):
                 # Рекурсивный вызов для вложенных атрибутов
-                nested_result[nested_attr.get("attribute_caption")] = self.extract_attribute(element, nested_attr)
+                nested_result[nested_attr.get("attribute_name")] = self.extract_attribute(element, nested_attr)
             return nested_result
         
         selector_info = attr.get("attribute_selector", {})
@@ -52,11 +52,11 @@ class FlexibleSpider(scrapy.Spider):
         elif attr_type == "array":
             all_values = [v.get().strip() for v in sub_elements if v.get()]
             delimiter = attr.get("delimiter", ";")
-            return delimiter.join(all_values)
-
+            return all_values
         # Для типа "link" возвращаем просто URL, а обработку ссылок оставляем в основном цикле
         elif attr_type == "link":
-            return sub_elements.get("href")
+            if sub_elements:
+                return sub_elements[0].attrib.get("href")
 
         else:
             return None
@@ -73,13 +73,13 @@ class FlexibleSpider(scrapy.Spider):
             elements = get_element_by_selector(response, object_path, object_selector_type)
             for element in elements:
                 self.object_counter += 1
-                item_data = {"object_id": self.object_counter}
+                item_data = {"Позиция в поиске": self.object_counter}
 
                 # Сначала обрабатываем все атрибуты, кроме типа "link"
                 for attr in obj.get("attributes", []):
                     attr_type = attr.get("attribute_type", "simple")
                     if attr_type != "link":
-                        item_data[attr.get("attribute_caption")] = self.extract_attribute(element, attr)
+                        item_data[attr.get("attribute_name")] = self.extract_attribute(element, attr)
                     
                     elif attr.get("attribute_type") == "link":
                         link = self.extract_attribute(element, attr)
@@ -90,7 +90,7 @@ class FlexibleSpider(scrapy.Spider):
                                 callback=self.parse_links,
                                 meta={
                                     "linked_attributes": attr.get("linked_attributes", []),
-                                    "item_data": {"object_id": self.object_counter}
+                                    "item_data": {"Позиция в поиске": self.object_counter}
                                 },
                                 dont_filter=True
                             )
@@ -146,7 +146,7 @@ class FlexibleSpider(scrapy.Spider):
 
         for linked_attr in linked_attributes:
             # Здесь используем рекурсивную обработку для linked_attributes, предполагая, что они могут быть вложенными
-            item_data[linked_attr.get("attribute_caption")] = self.extract_attribute(response, linked_attr)
+            item_data[linked_attr.get("attribute_name")] = self.extract_attribute(response, linked_attr)
 
         yield item_data
 

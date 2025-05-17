@@ -16,31 +16,27 @@ class Selector(BaseModel):
 
 
 class SimpleAttr(BaseModel):
-    attribute_name: str = Field(..., description="Уникальное имя атрибута для сбора данных")
-    attribute_caption: str = Field(..., description="Читаемое имя атрибута для отображения")
+    attribute_name: str = Field(..., description="Имя атрибута для сбора данных")
     attribute_type: Literal["simple"] = Field(..., description="Тип атрибута")
     attribute_selector: Selector = Field(..., description="Селектор для поиска атрибута")
 
 
 class ArrayAttr(BaseModel):
-    attribute_name: str = Field(..., description="Уникальное имя атрибута для сбора данных")
-    attribute_caption: str = Field(..., description="Читаемое имя атрибута для отображения")
+    attribute_name: str = Field(..., description="Имя атрибута для сбора данных")
     attribute_type: Literal["array"] = Field(..., description="Тип атрибута")
     attribute_selector: Selector = Field(..., description="Селектор для поиска атрибута")
     delimiter: Optional[str] = Field(None, description="Разделитель для типа array")
 
 
 class LinkAttr(BaseModel):
-    attribute_name: str = Field(..., description="Уникальное имя атрибута для сбора данных")
-    attribute_caption: str = Field(..., description="Читаемое имя атрибута для отображения")
+    attribute_name: str = Field(..., description="Имя атрибута для сбора данных")
     attribute_type: Literal["link"] = Field(..., description="Тип атрибута")
     attribute_selector: Selector = Field(..., description="Селектор для поиска атрибута")
     linked_attributes: List["Attribute"]
 
 
 class NestedAttr(BaseModel):
-    attribute_name: str = Field(..., description="Уникальное имя атрибута для сбора данных")
-    attribute_caption: str = Field(..., description="Читаемое имя атрибута для отображения")
+    attribute_name: str = Field(..., description="Имя атрибута для сбора данных")
     attribute_type: Literal["nested"] = Field(..., description="Тип атрибута")
     nested_attributes: List["Attribute"]
 
@@ -50,8 +46,7 @@ Attribute = Union[SimpleAttr, ArrayAttr, LinkAttr, NestedAttr]
 
 # Модель для описания объектов
 class ObjectMeta(BaseModel):
-    object_name: str = Field(..., description="Уникальное имя объекта для сбора данных")
-    object_caption: str = Field(..., description="Читаемое имя объекта для отображения")
+    object_name: str = Field(..., description="Имя объекта для сбора данных")
     object_selector: Optional[Selector] = Field(None, description="Селектор для поиска объекта на странице")
     attributes: List[Attribute] = Field(..., description="Список атрибутов объекта")
 
@@ -90,8 +85,6 @@ class PaginationSettings(BaseModel):
 
 # Модель для настроек краулера
 class CrawlerSettings(BaseModel):
-    request_headers: Optional[Dict[str, str]] = Field(None, description="Заголовки для HTTP-запросов")
-    request_delay: Optional[int] = Field(1, description="Задержка между запросами (в секундах)")
     allowed_domains: Optional[List[str]] = Field(None, description="Домены, разрешенные для краулинга")
     pagination: PaginationSettings = Field(..., description="Настройки пагинации")
 

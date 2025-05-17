@@ -18,7 +18,7 @@ class FlexibleExportPipeline:
         self.file.close()
 
     def process_item(self, item, spider):
-        object_id = item.get("object_id")
+        object_id = item.get("Позиция в поиске")
         if object_id is None:
             # Если object_id отсутствует, просто пропускаем элемент
             return item
