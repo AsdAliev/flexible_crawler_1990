@@ -50,9 +50,7 @@ class FlexibleSpider(scrapy.Spider):
             return extracted.strip() if extracted else None
 
         elif attr_type == "array":
-            all_values = [v.get().strip() for v in sub_elements if v.get()]
-            delimiter = attr.get("delimiter", ";")
-            return all_values
+            return [v.get().strip() for v in sub_elements if v.get()]
         # Для типа "link" возвращаем просто URL, а обработку ссылок оставляем в основном цикле
         elif attr_type == "link":
             if sub_elements:

@@ -15,7 +15,7 @@ from fastapi import FastAPI, BackgroundTasks
 from fastapi.responses import FileResponse, JSONResponse
 
 from models import CrawlerRequest
-from utils import dict_to_xml
+from utils import dict_to_xml, flatten_selected_fields
 
 from fastapi.middleware.cors import CORSMiddleware
 from authorization import router as auth_router 
@@ -228,10 +228,21 @@ def get_result(task_id: str, output_format: Literal["json", "csv", "xml"] = "jso
         )
  
     if output_format == "csv":
+        processed_items = []
+        for item in items:
+            flat_item = flatten_selected_fields(item)
+            processed_items.append(flat_item)
+
+        # Получаем все уникальные ключи из всех строк (чтобы не потерять колонки)
+        all_keys = set()
+        for row in processed_items:
+            all_keys.update(row.keys())
+
         with open(output_path, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=items[0].keys())
+            writer = csv.DictWriter(f, fieldnames=list(all_keys))
             writer.writeheader()
-            writer.writerows(items)
+            writer.writerows(processed_items)
+
         
         return FileResponse(
             path=output_path,

@@ -19,3 +19,24 @@ def dict_to_xml(parent, data):
         parent.text = ""
     else:
         parent.text = str(data)
+
+def flatten_selected_fields(d):
+    """
+    Оставляет верхнеуровневые ключи нетронутыми.
+    Если значение — словарь, раскрывает его содержимое на одном уровне.
+    """
+    flat = {}
+    for k, v in d.items():
+        if isinstance(v, dict):
+            for sub_k, sub_v in v.items():
+                if isinstance(sub_v, dict):
+                    for inner_k, inner_v in sub_v.items():
+                        flat[inner_k] = inner_v
+                else:
+                    flat[sub_k] = sub_v
+        elif isinstance(v, list):
+            flat[k] = ", ".join(map(str, v))
+        else:
+            flat[k] = v
+    return flat
+

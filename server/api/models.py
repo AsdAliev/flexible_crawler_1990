@@ -25,7 +25,6 @@ class ArrayAttr(BaseModel):
     attribute_name: str = Field(..., description="Имя атрибута для сбора данных")
     attribute_type: Literal["array"] = Field(..., description="Тип атрибута")
     attribute_selector: Selector = Field(..., description="Селектор для поиска атрибута")
-    delimiter: Optional[str] = Field(None, description="Разделитель для типа array")
 
 
 class LinkAttr(BaseModel):
