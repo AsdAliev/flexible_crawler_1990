@@ -1,0 +1,85 @@
+{
+    "start_url": "https://sunlight.net/catalog/",
+    "crawler_settings": {
+        "allowed_domains": [
+            "sunlight.net"
+        ],
+        "pagination": {
+            "enabled": true,
+            "max_pages": 2,
+            "next_page_selector": {
+                "path": "//a[@id='js-cl-next-link']",
+                "selector_type": "xpath"
+            }
+        }
+    },
+    "meta": [
+        {
+            "object_name": "Ювелирное украшение",
+            "object_selector": {
+                "path": "//div[contains(@class, 'cl-item') and contains(@class, 'js-cl-item') and @data-analytics-name]",
+                "selector_type": "xpath"
+            },
+            "attributes": [
+                {
+                    "attribute_name": "Основная информация",
+                    "attribute_type": "nested",
+                    "nested_attributes": [
+                        {
+                            "attribute_name": "Название",
+                            "attribute_selector": {
+                                "path": "string(@data-analytics-name)",
+                                "selector_type": "xpath"
+                            },
+                            "attribute_type": "simple"
+                        },
+                        {
+                            "attribute_name": "Артикул",
+                            "attribute_selector": {
+                                "path": "string(@data-analytics-article)",
+                                "selector_type": "xpath"
+                            },
+                            "attribute_type": "simple"
+                        }
+                    ]
+                },
+                {
+                    "attribute_name": "Информация о цене",
+                    "attribute_type": "nested",
+                    "nested_attributes": [
+                        {
+                            "attribute_name": "По скидке",
+                            "attribute_type": "nested",
+                            "nested_attributes": [
+                                {
+                                    "attribute_name": "Цена",
+                                    "attribute_selector": {
+                                        "path": "normalize-space(.//div[contains(@class, 'cl-item-info-price-discount')])",
+                                        "selector_type": "xpath"
+                                    },
+                                    "attribute_type": "simple"
+                                },
+                                {
+                                    "attribute_name": "Скидка",
+                                    "attribute_selector": {
+                                        "path": "normalize-space(.//span[contains(@class, 'cl-item-info-price-discount-percent')])",
+                                        "selector_type": "xpath"
+                                    },
+                                    "attribute_type": "simple"
+                                }
+                            ]
+                        },
+                        {
+                            "attribute_name": "Без скидки",
+                            "attribute_selector": {
+                                "path": "normalize-space(.//div[contains(@class, 'cl-item-info-price-full')]/s)",
+                                "selector_type": "xpath"
+                            },
+                            "attribute_type": "simple"
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
