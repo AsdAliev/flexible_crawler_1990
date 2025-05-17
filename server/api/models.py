@@ -1,61 +1,51 @@
-from typing import List, Dict, Literal, Optional, Union
+from typing import List, Literal, Optional, Union, Annotated
+from pydantic import BaseModel, Field, model_validator
 from typing_extensions import Self
 
-from pydantic import BaseModel, Field, model_validator
 
-"""
-Field(..., ) - обязательное поле
-Optional[int] = Field(0, ) - необязательное поле (по умолчанию 0)
-"""
-
-
-# Модель для описания селекторов
 class Selector(BaseModel):
     path: str = Field(..., description="Путь до элемента на странице (XPath или CSS)")
     selector_type: Literal["xpath", "css"] = Field(..., description="Тип селектора: xpath или css")
 
 
-class SimpleAttr(BaseModel):
+class BaseAttr(BaseModel):
     attribute_name: str = Field(..., description="Имя атрибута для сбора данных")
-    attribute_type: Literal["simple"] = Field(..., description="Тип атрибута")
+    attribute_type: str  # будет уточняться через Literal в подклассах
+
+
+class SimpleAttr(BaseAttr):
+    attribute_type: Literal["simple"]
     attribute_selector: Selector = Field(..., description="Селектор для поиска атрибута")
 
 
-class ArrayAttr(BaseModel):
-    attribute_name: str = Field(..., description="Имя атрибута для сбора данных")
-    attribute_type: Literal["array"] = Field(..., description="Тип атрибута")
+class ArrayAttr(BaseAttr):
+    attribute_type: Literal["array"]
     attribute_selector: Selector = Field(..., description="Селектор для поиска атрибута")
 
 
-class LinkAttr(BaseModel):
-    attribute_name: str = Field(..., description="Имя атрибута для сбора данных")
-    attribute_type: Literal["link"] = Field(..., description="Тип атрибута")
-    attribute_selector: Selector = Field(..., description="Селектор для поиска атрибута")
-    linked_attributes: List["Attribute"]
+Attribute = Annotated[
+    Union["SimpleAttr", "ArrayAttr", "LinkAttr", "NestedAttr"],
+    Field(discriminator="attribute_type")
+]
 
 
-class NestedAttr(BaseModel):
-    attribute_name: str = Field(..., description="Имя атрибута для сбора данных")
-    attribute_type: Literal["nested"] = Field(..., description="Тип атрибута")
-    nested_attributes: List["Attribute"]
+class NestedAttr(BaseAttr):
+    attribute_type: Literal["nested"]
+    nested_attributes: List[Attribute] = Field(..., description="Вложенные атрибуты")
 
 
-Attribute = Union[SimpleAttr, ArrayAttr, LinkAttr, NestedAttr]
+class LinkAttr(BaseAttr):
+    attribute_type: Literal["link"]
+    attribute_selector: Selector = Field(..., description="Селектор для поиска ссылки")
+    linked_attributes: List[Attribute] = Field(..., description="Атрибуты по ссылке")
 
 
-# Модель для описания объектов
 class ObjectMeta(BaseModel):
     object_name: str = Field(..., description="Имя объекта для сбора данных")
     object_selector: Optional[Selector] = Field(None, description="Селектор для поиска объекта на странице")
     attributes: List[Attribute] = Field(..., description="Список атрибутов объекта")
 
 
-LinkAttr.update_forward_refs()
-NestedAttr.update_forward_refs()
-ObjectMeta.update_forward_refs()
-
-
-# Модель для описания пагинации
 class PaginationSettings(BaseModel):
     enabled: bool = Field(..., description="Включена ли пагинация")
     max_pages: Optional[int] = Field(1, description="Максимальное количество страниц для парсинга")
@@ -69,27 +59,29 @@ class PaginationSettings(BaseModel):
         Проверяет, что указано либо 'url_param_template' с 'page_increment',
         либо 'next_page_selector', но не оба сразу и не пусто.
         """
-        if self.enabled is False:
+        if not self.enabled:
             return self
-        if self.url_param_template and self.page_increment and not self.next_page_selector:
+
+        url_params_set = self.url_param_template and self.page_increment
+        next_selector_set = self.next_page_selector is not None
+
+        if url_params_set and not next_selector_set:
             return self
-        if self.next_page_selector and not self.url_param_template and not self.page_increment:
+        if next_selector_set and not url_params_set:
             return self
 
         raise ValueError(
-            "Параметры пагинации должны включать либо 'url_param_template' с 'page_increment', "
-            "либо 'next_page_selector', но не оба сразу и не пусто."
+            "Пагинация должна содержать либо (url_param_template + page_increment), "
+            "либо (next_page_selector), но не оба и не ни одного."
         )
 
 
-# Модель для настроек краулера
 class CrawlerSettings(BaseModel):
-    allowed_domains: Optional[List[str]] = Field(None, description="Домены, разрешенные для краулинга")
+    allowed_domains: Optional[List[str]] = Field(None, description="Разрешенные домены")
     pagination: PaginationSettings = Field(..., description="Настройки пагинации")
 
 
-# Основная модель для входящего запроса
 class CrawlerRequest(BaseModel):
     start_url: str = Field(..., description="Начальный URL для парсинга")
     crawler_settings: CrawlerSettings = Field(..., description="Настройки краулера")
-    meta: List[ObjectMeta] = Field(..., description="Список объектов и их атрибутов для сбора данных")
+    meta: List[ObjectMeta] = Field(..., description="Список объектов для сбора данных")

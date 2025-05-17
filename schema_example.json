@@ -44,8 +44,7 @@
                         "path": "h4[class='results__title']",
                         "selector_type": "css"
                     },
-                    "attribute_type": "array",
-                    "delimiter": ";"
+                    "attribute_type": "array"
                 },
                 {
                     "attribute_name": "Страница объекта",
