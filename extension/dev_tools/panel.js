@@ -337,7 +337,7 @@ function fillDatalistFromUrl(urlString) {
         option.textContent = `${key}=${value}`;
         option.type = 'button';
         option.addEventListener('click', () => {
-            document.getElementById('pagination-query-param-input').value = option.textContent;
+            document.getElementById('pagination-query-param-input').value = option.textContent.split('=')[0] + '={page_number}';
         });
         datalist.appendChild(option);
     }
