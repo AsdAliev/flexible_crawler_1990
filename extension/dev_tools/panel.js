@@ -216,7 +216,7 @@ parseForm.addEventListener('submit', (e) => {
 
 async function sendParseRequest() {
     try {
-        const start_url = (await chrome.runtime.sendMessage({ action: "getActiveTab" }))?.url; // TODO
+        const start_url = document.getElementById('request-main-url').value; // TODO
         const objectMeta = getRequestMeta();
         const parse_settings = getParseSettings();
 
@@ -261,7 +261,7 @@ document.getElementById('clear-form-btn').addEventListener('click', () => {
     }
 });
 
-function setupParseSettings() {
+async function setupParseSettings() {
     const enablePagination = document.getElementById('enable-pagination');
     enablePagination.addEventListener('change', () => {
         if (enablePagination.checked) {
@@ -281,7 +281,68 @@ function setupParseSettings() {
             document.getElementById('pagination-query-param').style.display = 'block';
         }
     });
+
+    document.getElementById('request-main-url').value = (await chrome.runtime.sendMessage({ action: "getActiveTab" }))?.url;
+    fillDatalistFromUrl(document.getElementById('request-main-url').value);
+    document.getElementById('refresh-url-btn').addEventListener('click', async () => {
+        document.getElementById('request-main-url').value = (await chrome.runtime.sendMessage({ action: "getActiveTab" }))?.url;
+        fillDatalistFromUrl(document.getElementById('request-main-url').value);
+    });
+    document.getElementById('pagination-query-param-input').addEventListener('focus', () => {
+        document.getElementById('datalist-url-param').classList.remove('d-none');
+    });
+    document.getElementById('pagination-query-param-input').addEventListener('blur', () => {
+        setTimeout(() => { document.getElementById('datalist-url-param').classList.add('d-none'); }, 100);
+    });
+    document.getElementById('pagination-query-param-input').addEventListener('input', () => {
+        filterDatalist();
+    });
 }
+
+function filterDatalist() {
+    const inputEl = document.getElementById('pagination-query-param-input');
+    const datalist = document.getElementById('datalist-url-param');
+    const filter = inputEl.value.toLowerCase();
+    datalist.childNodes.forEach(li => {
+        li.classList.toggle('d-none', !li.textContent.toLowerCase().includes(filter));
+    });
+}
+
+/**
+   * Parses the given URL string and fills the datalist with param=value options.
+   * @param {string} urlString - The full URL containing query parameters.
+   */
+function fillDatalistFromUrl(urlString) {
+    const datalist = document.getElementById('datalist-url-param');
+    if (!datalist) {
+        console.error('No datalist found with id="datalist-url-param"');
+        return;
+    }
+
+    // Clear any existing options
+    datalist.innerHTML = '';
+
+    let url;
+    try {
+        url = new URL(urlString);
+    } catch (e) {
+        console.error('Invalid URL:', urlString);
+        return;
+    }
+
+    // Iterate over each query parameter
+    for (const [key, value] of url.searchParams) {
+        const option = document.createElement('button');
+        option.classList.add('list-group-item', 'list-group-item-action');
+        option.textContent = `${key}=${value}`;
+        option.type = 'button';
+        option.addEventListener('click', () => {
+            document.getElementById('pagination-query-param-input').value = option.textContent;
+        });
+        datalist.appendChild(option);
+    }
+}
+
 
 /**
  * 
