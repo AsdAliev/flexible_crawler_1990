@@ -20,6 +20,26 @@ security = HTTPBearer()
 # === Хранилище отозванных access-токенов ===
 revoked_tokens = set()
 
+# ────────────────────────────────────────────────────────────────
+# DEPENDENCY: current logged-in user
+# ────────────────────────────────────────────────────────────────
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+) -> dict:
+    """Возвращает {'id': …, 'username': …} для валидного access-токена."""
+    user_id = verify_token(credentials.credentials)          # проверяем JWT
+
+    conn = sqlite3.connect("users.db")
+    c    = conn.cursor()
+    c.execute("SELECT id, username FROM users WHERE id = ?", (user_id,))
+    row = c.fetchone()
+    conn.close()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return {"id": row[0], "username": row[1]}
+
 # === Инициализация БД ===
 def init_db():
     conn = sqlite3.connect("users.db")

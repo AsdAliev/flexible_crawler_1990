@@ -20,7 +20,7 @@ from authorization import router as auth_router
 
 import json, sqlite3, datetime as dt
 from fastapi import Depends
-from api.authorization import get_current_user    # <- уже существует в authorization.py
+from authorization import get_current_user    # <- уже существует в authorization.py
 
 DB_PATH = "users.db"          # тот же файл, где уже лежит таблица users
 
@@ -359,7 +359,7 @@ def delete_files(task_id: str, user = Depends(get_current_user)):
         status_code=200
     )
 
-from api.history import router as history_router
+from history import router as history_router
 app.include_router(history_router)
 
 if __name__ == "__main__":
