@@ -30,7 +30,8 @@ function createRequestCard(request) {
                     ${request.name}
                 </a>
             </div>
-            ${formatDate(new Date(request.createdAt))}
+            <span>${formatDate(new Date(request.createdAt))}</span>
+            <span class="d-block text-truncate text-secondary" style="max-width: 350px; font-size: 0.85rem;">${request.request.start_url}</span>
         </div>
         <span class="badge ${request.status == 'crawler started' || request.status == 'in progress' ? 'text-bg-warning' : 'text-bg-success'} rounded-pill">
             ${request.status == 'crawler started' || request.status == 'in progress' ? 'Выполняется' : 'Готово'}
