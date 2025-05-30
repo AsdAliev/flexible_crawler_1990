@@ -1,0 +1,76 @@
+version: '3.8'
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.0.1
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.0.1
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"   # внутренний listener
+      - "9094:9094"   # внешний listener
+    environment:
+      # Соединяемся с ZK
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+
+      # Определяем 2 слушателя на разных портах
+      KAFKA_LISTENERS: PLAINTEXT_INTERNAL://0.0.0.0:9092,PLAINTEXT_EXTERNAL://0.0.0.0:9094
+
+      # Какими адресами рекламируем их другим клиентам
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT_INTERNAL://kafka:9092,PLAINTEXT_EXTERNAL://localhost:9094
+
+      # Соответствие имён слушателей и протоколов
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: >
+        PLAINTEXT_INTERNAL:PLAINTEXT,
+        PLAINTEXT_EXTERNAL:PLAINTEXT
+
+      # Какой listener используют меж-брокерное общение
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+
+      # Топики создаются автоматически
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+
+  # ----------------------------
+  # 3) Scrapyd-сервис
+  scrapyd:
+    build:
+      context: .
+      dockerfile: scrapyd/Dockerfile
+    depends_on:
+      - kafka
+    environment:
+      # Пайплайн внутри контейнера будет брать отсюда адрес
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      # (не трогаем host.docker.internal — здесь мы в одной bridge-сети)
+    volumes:
+      - scrapyd_eggs:/scrapyd/eggs
+      - scrapyd_logs:/scrapyd/logs
+      - scrapyd_items:/scrapyd/items
+    ports:
+      - "6800:6800"
+
+  # ----------------------------
+  # 4) FastAPI-фасад
+  api:
+    build: ./api
+    depends_on:
+      - scrapyd
+    environment:
+      SCRAPYD_URL: "http://scrapyd:6800"
+      PROJECT_NAME: "flex_crawler"
+      ITEMS_DIR:   "/scrapyd/items"
+    volumes:
+      - scrapyd_items:/scrapyd/items
+    ports:
+      - "8000:8000"
+
+volumes:
+  scrapyd_eggs:
+  scrapyd_logs:
+  scrapyd_items:

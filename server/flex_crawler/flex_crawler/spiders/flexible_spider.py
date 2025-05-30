@@ -9,15 +9,11 @@ from .utils import get_element_by_selector, extract_current_page_from_url
 class FlexibleSpider(scrapy.Spider):
     name = "flexible_spider"
 
-    def __init__(self, config_path, output_path, *args, **kwargs):
+    def __init__(self, config=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.config_path = config_path
-        self.output_path = output_path
-        self.object_counter = 0  # Глобальный счетчик для ключей
 
-        if self.config_path and os.path.exists(self.config_path):
-            with open(self.config_path, "r", encoding="utf-8") as f:
-                self.config = json.load(f)
+        self.object_counter = 0  # Глобальный счетчик для ключей
+        self.config = json.loads(config) if config else {}
         self.allowed_domains = self.config.get('crawler_settings', {}).get('allowed_domains', all)
         self.start_page = None
 

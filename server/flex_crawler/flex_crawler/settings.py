@@ -64,7 +64,8 @@ ROBOTSTXT_OBEY = True
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 
 ITEM_PIPELINES = {
-    'flex_crawler.pipelines.FlexibleExportPipeline': 300,
+    'flex_crawler.pipelines.KafkaPipeline': 400
+    # 'flex_crawler.pipelines.FlexibleExportPipeline': 300,
 }
 
 # Enable and configure the AutoThrottle extension (disabled by default)
