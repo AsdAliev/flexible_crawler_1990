@@ -3,6 +3,32 @@ import { appSettings } from '../app-settings.js';
 export let isAuthenticated = false;
 export let Name = null;
 
+// ───────────────────────────────────────────────────────────────
+// Вернуть access-token (или null).  Использует те же localStorage
+// ключи, что уже применяет checkAuth().
+//
+//   Если нужно проверять срок действия, сохраните время истечения
+//   (unix-секунды) под ключом "access_token_exp" и раскомментируйте
+//   проверку exp.
+//   Возвращаем Promise, чтобы вызов  `await getToken()`  выглядел
+//   единообразно с Async-API chrome.storage, если когда-нибудь
+//   решите перейти на него.
+// ───────────────────────────────────────────────────────────────
+export async function getToken() {
+    return new Promise(resolve => {
+        const token = localStorage.getItem('access_token');
+
+    const exp = Number(localStorage.getItem('access_token_exp') || 0);
+    const now = Date.now() / 1000;
+    if (!token || (exp && now >= exp)) {
+        return resolve(null);           // токена нет или он просрочен
+    }
+
+        resolve(token || null);
+    });
+}
+
+
 export async function checkAuth() {
     const token = localStorage.getItem("access_token");
     const refreshToken = localStorage.getItem("refresh_token");
@@ -52,6 +78,7 @@ export async function loginUser(username, password) {
 
         localStorage.setItem("access_token", data.access_token);
         localStorage.setItem("refresh_token", data.refresh_token);
+        localStorage.setItem("access_token_exp", data.access_expires);
         if (await checkAuth()) {
             return true;
         } else {

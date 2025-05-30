@@ -1,4 +1,8 @@
 // indexedDB wrapper for storing request history
+import { getToken }          from '../popup/user.js';
+import { appSettings }       from '../app-settings.js';
+
+const API_ROOT = appSettings.serverDomain.replace(/\/$/, '');   // "http://localhost:8000"
 const DB_NAME = 'requestHistoryDB';
 const DB_VERSION = 1;
 const STORE_NAME = 'requests';
@@ -24,16 +28,30 @@ function openDB() {
  * @param {{id: string, status: string, name: string, request: object}} entry
  */
 export async function addRequest(entry) {
+    const token = await getToken();
+
+    // --- авторизованный пользователь: отправляем запись на сервер --
+    if (token) {
+        await fetch(`${API_ROOT}history`, {
+            method: 'POST',
+            headers: {
+                'Content-Type':  'application/json',
+                'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify(entry),
+        });
+        return;                          // и сразу выходим
+    }
+
+    // --- неавторизованный режим: IndexedDB как раньше ---------------
     const db = await openDB();
     return new Promise((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const tx    = db.transaction(STORE_NAME, 'readwrite');
         const store = tx.objectStore(STORE_NAME);
-        if (!entry.createdAt) {
-            entry.createdAt = Date.now();
-        }
-        const req = store.add(entry);
+        if (!entry.createdAt) entry.createdAt = Date.now();
+        const req  = store.add(entry);
         req.onsuccess = () => resolve();
-        req.onerror = e => reject(e.target.error);
+        req.onerror   = e => reject(e.target.error);
     });
 }
 
@@ -43,21 +61,24 @@ export async function addRequest(entry) {
  * @param {string} newStatus
  */
 export async function updateStatus(id, newStatus) {
+    // Сервер сам обновляет статус — клиенту ничего делать не нужно
+    const token = await getToken();
+    if (token) return;
+
+    // Локальный режим (IndexedDB) — старая логика
     const db = await openDB();
     return new Promise((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, 'readwrite');
-        const store = tx.objectStore(STORE_NAME);
-        const getReq = store.get(id);
-
+        const tx       = db.transaction(STORE_NAME, 'readwrite');
+        const store    = tx.objectStore(STORE_NAME);
+        const getReq   = store.get(id);
         getReq.onsuccess = () => {
             const data = getReq.result;
             if (!data) return reject(new Error('Запись не найдена'));
             data.status = newStatus;
             const putReq = store.put(data);
             putReq.onsuccess = () => resolve();
-            putReq.onerror = e => reject(e.target.error);
+            putReq.onerror   = e => reject(e.target.error);
         };
-
         getReq.onerror = e => reject(e.target.error);
     });
 }
@@ -67,6 +88,15 @@ export async function updateStatus(id, newStatus) {
  * @param {string} id
  */
 export async function deleteRequest(id) {
+    const token = await getToken();
+    if (token) {
+        await fetch(`${API_ROOT}history/${id}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        return;
+    }
+
     const db = await openDB();
     return new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, 'readwrite');
@@ -81,6 +111,15 @@ export async function deleteRequest(id) {
  * Удалить все записи
  */
 export async function deleteAllRequests() {
+    const token = await getToken();
+    if (token) {
+        await fetch(`${API_ROOT}history`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        return;
+    }
+
     const db = await openDB();
     return new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, 'readwrite');
@@ -97,6 +136,16 @@ export async function deleteAllRequests() {
  * @returns {Promise<{id: string, status: string, request: object, createdAt: number} | undefined>}
  */
 export async function getRequestById(id) {
+    const token = await getToken();
+    if (token) {
+        const r = await fetch(`${API_ROOT}history/${id}`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!r.ok) throw new Error(await r.text());
+        return await r.json();
+    }
+
+
     const db = await openDB();
     return new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, 'readonly');
@@ -116,6 +165,15 @@ export async function getRequestById(id) {
  * @returns {Promise<Array<{id: string, status: string, request: object}>>}
  */
 export async function getAllRequests() {
+    const token = await getToken();
+    if (token) {
+        const r = await fetch(`${API_ROOT}history?limit=1000`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        return await r.json();
+    }
+
+
     const db = await openDB();
     return new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, 'readonly');
@@ -133,6 +191,14 @@ export async function getAllRequests() {
  * @returns {Promise<Array<{id: string, status: string, request: object, createdAt: number}>>}
  */
 export async function getRecentRequests(n = 0) {
+    const token = await getToken();
+    if (token) {
+        const r = await fetch(`${API_ROOT}history?limit=${n || 50}`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        return await r.json();
+    }
+
     const all = await getAllRequests();
     if (!n) {
         return all.sort((a, b) => b.createdAt - a.createdAt);
