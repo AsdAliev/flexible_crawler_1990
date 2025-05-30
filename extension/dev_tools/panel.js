@@ -33,6 +33,14 @@ document.getElementById('request-name-input').addEventListener('focus',
     }
 );
 
+document.getElementById('next-pagination-elem-path').addEventListener('focus', () => {
+    FormHelper.prevPath.input?.classList.remove('border-primary');
+    FormHelper.prevPath.input = document.getElementById('next-pagination-elem-path');
+    FormHelper.prevPath.input.classList.add('border-primary');
+    FormHelper.prevPath.type = document.getElementById('pagination-path-type');
+    FormHelper.prevPath.isRel = true;
+});
+
 const parseForm = document.getElementById('parse-form');
 const FormHelper = {
     objectCounter: 0,
@@ -216,7 +224,7 @@ parseForm.addEventListener('submit', (e) => {
 
 async function sendParseRequest() {
     try {
-        const start_url = document.getElementById('request-main-url').value; // TODO
+        const start_url = document.getElementById('request-main-url').value;
         const objectMeta = getRequestMeta();
         const parse_settings = getParseSettings();
 
