@@ -1,6 +1,7 @@
 import * as requestDB from '../storage/request-storage.js';
 import { CrawlerRequest } from '../dev_tools/api-classes.js';
 import { appSettings } from '../app-settings.js';
+import { showResultPage } from '../result-page/result-page.js'
 
 export async function fillRequestList() {
     const reqList = document.getElementById('requests-container__list');
@@ -24,7 +25,8 @@ function createRequestCard(request) {
     let intId = null;
     card.classList.add('list-group-item', 'd-flex', 'justify-content-between', 'align-items-start');
     card.innerHTML = `
-        <div class="ms-2 me-auto">
+        <div class="ms-2 flex-shrink-1"
+            style="flex: 1 1 60%; min-width: 0;">
             <div class="fw-bold">
                 <a href="#" class="${request.status == 'crawler started' || request.status == 'in progress' ? 'link-secondary' : 'link-success'} link-offset-2 link-underline-opacity-25 link-underline-opacity-100-hover">
                     ${request.name}
@@ -106,10 +108,10 @@ function createRequestCard(request) {
                         requestDB.updateStatus(request.id, status);
                         card.querySelector('a').classList.remove('link-secondary');
                         card.querySelector('a').classList.add('link-success');
-                        card.querySelector('span').classList.remove('text-bg-warning');
-                        card.querySelector('span').classList.add('text-bg-success');
-                        card.querySelector('span').textContent = 'Готово';
-                        card.querySelector('a').onclick = () => { getResult(request.id, appSettings.downloadType, request.name) };
+                        card.querySelector('span.badge').classList.remove('text-bg-warning');
+                        card.querySelector('span.badge').classList.add('text-bg-success');
+                        card.querySelector('span.badge').textContent = 'Готово';
+                        card.querySelector('a').onclick = () => { getResult(request.id, appSettings.downloadType, request.name, true) };
                         card.querySelectorAll('button.dropdown-item').forEach((x) => { x.disabled = false; })
                         clearInterval(intId);
                         intId = null;
@@ -120,7 +122,7 @@ function createRequestCard(request) {
         }, 2000);
     }
     if (request.status == 'completed') {
-        card.querySelector('a').onclick = () => { getResult(request.id, appSettings.downloadType, request.name); };
+        card.querySelector('a').onclick = () => { getResult(request.id, appSettings.downloadType, request.name, true); };
     }
     return card;
 }
@@ -167,8 +169,10 @@ async function getStatus(taskId) {
  *
  * @param {string} taskId — ID задачи
  * @param {'json'|'csv'|'xml'} format — желаемый формат выходного файла
+ * @param {string|null} name
+ * @param {boolean} isPage
  */
-async function getResult(taskId, format, name = null) {
+async function getResult(taskId, format, name = null, isPage = false) {
     const url = appSettings.serverDomain + `result/${encodeURIComponent(taskId)}?output_format=${encodeURIComponent(format)}`;
 
     try {
@@ -188,18 +192,20 @@ async function getResult(taskId, format, name = null) {
             return;
         }
 
-        // Всё ок — получаем файл
-        if (response.ok) {
-            // Читаем тело как Blob
-            const blob = await response.blob();
-            // Генерируем имя файла на основе формата
-            let filename;
-            if (name) {
-                filename = `${name}_result.${format}`;
-            } else {
-                filename = `${taskId}_result.${format}`;
-            }
+        if (!response.ok) {
+            console.error('Неожиданный ответ:', response.status);
+            return;
+        }
 
+        if (isPage) {
+            // читаем ответ как текст и передаём в модуль
+            const raw = await response.text();
+            showResultPage(raw, format);
+        } else {
+            const blob = await response.blob();
+            const filename = name
+                ? `${name}_result.${format}`
+                : `${taskId}_result.${format}`;
             downloadBlob(blob, filename);
         }
     } catch (err) {
