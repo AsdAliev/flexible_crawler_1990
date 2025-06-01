@@ -1,11 +1,28 @@
 import * as requestDB from '../storage/request-storage.js';
 import { CrawlerRequest } from '../dev_tools/api-classes.js';
 import { appSettings } from '../app-settings.js';
+import { showResultPage } from '../result-page/result-page.js';
+import * as userRequests from '../storage/user-request-storage.js';
+import * as User from './user.js';
+
+/** @type {requestDB} */
+let requestHandler;
+
+if (await User.checkAuth()) {
+    requestHandler = userRequests;
+} else {
+    requestHandler = requestDB;
+}
 
 export async function fillRequestList() {
+    if (await User.checkAuth()) {
+        requestHandler = userRequests;
+    } else {
+        requestHandler = requestDB;
+    }
     const reqList = document.getElementById('requests-container__list');
     reqList.innerHTML = '';
-    const reqs = await requestDB.getRecentRequests();
+    const reqs = await requestHandler.getRecentRequests();
     console.log(reqs);
 
     if (reqs.length) {
@@ -20,17 +37,20 @@ export async function fillRequestList() {
  * @returns 
  */
 function createRequestCard(request) {
+    console.log(request.status);
     const card = document.createElement('li');
     let intId = null;
     card.classList.add('list-group-item', 'd-flex', 'justify-content-between', 'align-items-start');
     card.innerHTML = `
-        <div class="ms-2 me-auto">
+        <div class="ms-2 flex-shrink-1"
+            style="flex: 1 1 60%; min-width: 0;">
             <div class="fw-bold">
                 <a href="#" class="${request.status == 'crawler started' || request.status == 'in progress' ? 'link-secondary' : 'link-success'} link-offset-2 link-underline-opacity-25 link-underline-opacity-100-hover">
                     ${request.name}
                 </a>
             </div>
-            ${formatDate(new Date(request.createdAt))}
+            <span>${formatDate(new Date(request.createdAt))}</span>
+            <span class="d-block text-truncate text-secondary" style="max-width: 350px; font-size: 0.85rem;">${request.request.start_url}</span>
         </div>
         <span class="badge ${request.status == 'crawler started' || request.status == 'in progress' ? 'text-bg-warning' : 'text-bg-success'} rounded-pill">
             ${request.status == 'crawler started' || request.status == 'in progress' ? 'Выполняется' : 'Готово'}
@@ -55,26 +75,32 @@ function createRequestCard(request) {
     });
     cardLinks[1].addEventListener('click', async () => {
         try {
+            const token = await User.getToken();
             const req = new CrawlerRequest(request.request.start_url, request.request.crawler_settings, request.request.meta);
             console.log(req.toJSON());
 
-            const answer = await req.sendParsingTask();
+            const answer = await req.sendParsingTask(token ? token : undefined);
             const reqId = answer.task_id;
             const reqStatus = answer.status;
 
-            requestDB.addRequest({
-                id: reqId,
-                status: reqStatus,
-                name: request.name,
-                request: req
-            }).then(
-                () => {
-                    const reqList = document.getElementById('requests-container__list');
-                    requestDB.getRequestById(reqId).then(req => {
-                        reqList.insertBefore(createRequestCard(req), reqList.firstChild);
-                    });
-                }
-            );
+            if (!token) {
+                console.log(req.toJSON());
+                requestHandler.addRequest({
+                    id: reqId,
+                    status: reqStatus,
+                    name: request.name,
+                    request: req
+                }).then(
+                    () => {
+                        const reqList = document.getElementById('requests-container__list');
+                        requestHandler.getRequestById(reqId).then(req => {
+                            reqList.insertBefore(createRequestCard(req), reqList.firstChild);
+                        });
+                    }
+                );
+            } else {
+                fillRequestList();
+            }
         }
         catch (error) {
             console.log(error);
@@ -83,8 +109,9 @@ function createRequestCard(request) {
     cardLinks[2].addEventListener('click', () => {
         getResult(request.id, appSettings.downloadType, request.name);
     });
-    cardLinks[3].addEventListener('click', () => {
-        requestDB.deleteRequest(request.id);
+    cardLinks[3].addEventListener('click', async () => {
+        const token = await User.getToken();
+        requestHandler.deleteRequest(token ? request.DBid : request.id);
         if (intId) {
             clearInterval(intId);
         }
@@ -102,13 +129,13 @@ function createRequestCard(request) {
                     if (status === 'in progress' || status == 'crawler started') {
                         return;
                     } else if (status === 'completed') {
-                        requestDB.updateStatus(request.id, status);
+                        requestHandler.updateStatus(request.id, status);
                         card.querySelector('a').classList.remove('link-secondary');
                         card.querySelector('a').classList.add('link-success');
-                        card.querySelector('span').classList.remove('text-bg-warning');
-                        card.querySelector('span').classList.add('text-bg-success');
-                        card.querySelector('span').textContent = 'Готово';
-                        card.querySelector('a').onclick = () => { getResult(request.id, appSettings.downloadType, request.name) };
+                        card.querySelector('span.badge').classList.remove('text-bg-warning');
+                        card.querySelector('span.badge').classList.add('text-bg-success');
+                        card.querySelector('span.badge').textContent = 'Готово';
+                        card.querySelector('a').onclick = () => { getResult(request.id, appSettings.downloadType, request.name, true) };
                         card.querySelectorAll('button.dropdown-item').forEach((x) => { x.disabled = false; })
                         clearInterval(intId);
                         intId = null;
@@ -119,7 +146,7 @@ function createRequestCard(request) {
         }, 2000);
     }
     if (request.status == 'completed') {
-        card.querySelector('a').onclick = () => { getResult(request.id, appSettings.downloadType, request.name); };
+        card.querySelector('a').onclick = () => { getResult(request.id, appSettings.downloadType, request.name, true); };
     }
     return card;
 }
@@ -166,8 +193,10 @@ async function getStatus(taskId) {
  *
  * @param {string} taskId — ID задачи
  * @param {'json'|'csv'|'xml'} format — желаемый формат выходного файла
+ * @param {string|null} name
+ * @param {boolean} isPage
  */
-async function getResult(taskId, format, name = null) {
+async function getResult(taskId, format, name = null, isPage = false) {
     const url = appSettings.serverDomain + `result/${encodeURIComponent(taskId)}?output_format=${encodeURIComponent(format)}`;
 
     try {
@@ -187,18 +216,20 @@ async function getResult(taskId, format, name = null) {
             return;
         }
 
-        // Всё ок — получаем файл
-        if (response.ok) {
-            // Читаем тело как Blob
-            const blob = await response.blob();
-            // Генерируем имя файла на основе формата
-            let filename;
-            if (name) {
-                filename = `${name}_result.${format}`;
-            } else {
-                filename = `${taskId}_result.${format}`;
-            }
+        if (!response.ok) {
+            console.error('Неожиданный ответ:', response.status);
+            return;
+        }
 
+        if (isPage) {
+            // читаем ответ как текст и передаём в модуль
+            const raw = await response.text();
+            showResultPage(raw, format);
+        } else {
+            const blob = await response.blob();
+            const filename = name
+                ? `${name}_result.${format}`
+                : `${taskId}_result.${format}`;
             downloadBlob(blob, filename);
         }
     } catch (err) {
