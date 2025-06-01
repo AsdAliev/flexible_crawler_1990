@@ -18,6 +18,31 @@ from models import CrawlerRequest
 from fastapi.middleware.cors import CORSMiddleware
 from authorization import router as auth_router 
 
+import json, sqlite3, datetime as dt
+from fastapi import Depends
+from authorization import get_current_user    # <- уже существует в authorization.py
+
+DB_PATH = "users.db"          # тот же файл, где уже лежит таблица users
+
+def _history_update(task_id: str, **cols) -> None:
+    """
+    Обновляет любые поля записи в crawler_requests.
+    Пример: _history_update(task_id, status='completed', result_path='results/...')
+    """
+    if not cols:
+        return
+    sets = ", ".join(f"{k}=?" for k in cols)           # status=?, result_path=? …
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            f"""
+            UPDATE crawler_requests
+               SET {sets},
+                   updated_at=?
+             WHERE task_id=?""",
+            list(cols.values()) + [dt.datetime.utcnow(), task_id],
+        )
+
+
 app = FastAPI(
     title="Flexible Crawler API",
     description="API для запуска гибкого краулера на базе Scrapy",
@@ -54,7 +79,7 @@ def read_root():
 
 
 @app.post("/start_crawler")
-def start_crawler(data: CrawlerRequest, background_tasks: BackgroundTasks):
+def start_crawler(data: CrawlerRequest, background_tasks: BackgroundTasks, user = Depends(get_current_user)):
     """
     Эндпоинт для запуска краулера.
     Принимает JSON с параметрами парсинга (start_url, crawler_settings, meta).
@@ -78,7 +103,21 @@ def start_crawler(data: CrawlerRequest, background_tasks: BackgroundTasks):
 
     # Обновляем статус задачи
     with status_lock:
-        task_data[task_id] = {"status": "in progress"}
+        task_data[task_id] = {"status": "in progress", "format": "json"}
+    # ▸ Пишем строку в crawler_requests -----------------------------------
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            """
+            INSERT INTO crawler_requests
+                  (user_id, task_id, start_url, payload_json)
+            VALUES (?, ?, ?, ?)
+            """,
+            (user["id"],                # гарантирует, что задача «чья-то»
+             task_id,
+             data.start_url,
+             data.model_dump_json())
+        )
+        
 
     # Запускаем Scrapy через subprocess, передавая нужные аргументы
     # Обратите внимание, что flexible_spider должен уметь получать task_id и config_path
@@ -98,10 +137,12 @@ def start_crawler(data: CrawlerRequest, background_tasks: BackgroundTasks):
             subprocess.run(cmd, cwd=os.path.join(os.path.dirname(__file__), "..", "flex_crawler"))
             with status_lock:
                 task_data[task_id]["status"] = "completed"
+            _history_update(task_id, status="completed")
         except subprocess.CalledProcessError as e:
             with status_lock:
                 task_data[task_id]["status"] = "failed"
                 task_data[task_id]["error"] = str(e)
+            _history_update(task_id, status="failed")
 
     # Запускаем краулер в фоне
     background_tasks.add_task(run_crawler)
@@ -132,7 +173,9 @@ def get_status(task_id: str):
             },
             status_code=404
         )
-
+        
+    _history_update(task_id, status=current_data["status"])
+    
     return JSONResponse(
         content={
             "task_id": task_id,
@@ -184,6 +227,7 @@ def get_result(task_id: str, output_format: Literal["json", "csv", "xml"] = "jso
 
     # Путь к результату
     result_path = os.path.join(RESULTS_DIR, f"{task_id}_result.json")
+    _history_update(task_id, status="completed", result_path=result_path)
 
     # Проверяем существование файла
     if not os.path.exists(result_path):
@@ -263,7 +307,7 @@ def get_result(task_id: str, output_format: Literal["json", "csv", "xml"] = "jso
 
 
 @app.delete("/delete/{task_id}")
-def delete_files(task_id: str):
+def delete_files(task_id: str, user = Depends(get_current_user)):
 
     """
     Эндпоинт для удаления промежуточной схемы и результата задачи по Task ID.
@@ -295,6 +339,11 @@ def delete_files(task_id: str):
 
     # Удаляем запись о задаче из словаря статусов
     del task_data[task_id]
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            "DELETE FROM crawler_requests WHERE task_id=? AND user_id=?",
+            (task_id, user["id"])
+        )
 
     return JSONResponse(
         content={
@@ -310,6 +359,8 @@ def delete_files(task_id: str):
         status_code=200
     )
 
+from history import router as history_router
+app.include_router(history_router)
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
