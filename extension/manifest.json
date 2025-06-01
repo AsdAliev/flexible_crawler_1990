@@ -33,5 +33,19 @@
     ],
     "background": {
         "service_worker": "background.js"
-    }
+    },
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "result-page/result-page.html",
+                "result-page/result-page-renderer.js",
+                "styles/bootstrap.min.css",
+                "styles/bootstrap.bundle.min.js",
+                "styles/light-dark-switcher.js"
+            ],
+            "matches": [
+                "<all_urls>"
+            ]
+        }
+    ]
 }

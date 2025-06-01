@@ -3,6 +3,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import sqlite3, bcrypt, jwt
 from datetime import datetime, timedelta
 from fastapi import APIRouter
+from typing import Optional
 
 router = APIRouter()
 
@@ -15,10 +16,38 @@ REFRESH_TOKEN_EXP_DAYS = 7
 
 # === Init FastAPI & Auth ===
 app = FastAPI()
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 # === Хранилище отозванных access-токенов ===
 revoked_tokens = set()
+
+# ────────────────────────────────────────────────────────────────
+# DEPENDENCY: current logged-in user
+# ────────────────────────────────────────────────────────────────
+def get_current_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)
+) -> dict:
+    """
+    Если нет заголовка Authorization или токен невалиден, сразу возвращаем None.
+    Иначе — возвращаем {"id":…, "username":…}.
+    """
+    if credentials is None:
+        # Нет Authorization-заголовка → считаем неавторизованным, возвращаем None
+        return None
+    
+    """Возвращает {'id': …, 'username': …} для валидного access-токена."""
+    user_id = verify_token(credentials.credentials)          # проверяем JWT
+
+    conn = sqlite3.connect("users.db")
+    c    = conn.cursor()
+    c.execute("SELECT id, username FROM users WHERE id = ?", (user_id,))
+    row = c.fetchone()
+    conn.close()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return {"id": row[0], "username": row[1]}
 
 # === Инициализация БД ===
 def init_db():
@@ -46,6 +75,50 @@ def init_db():
     conn.close()
 
 init_db()
+
+# === Инициализация БД 2 ===
+def init_history_table() -> None:
+    """
+    Создаёт таблицу crawler_requests, если её ещё нет.
+
+    • id – локальный autoincrement-ключ (можно не показывать пользователю);
+    • user_id – владелец записи, ссылается на users(id);
+    • task_id – строковый идентификатор задачи в Scrapy/планировщике;
+    • start_url – URL, с которого начали краулинг;
+    • payload_json – исходная конфигурация паука (храним целиком);
+    • status – текущее состояние (‘in progress’, ‘completed’, ‘error’);
+    • result_path – относительный путь к сохранённому файлу результата;
+    • created_at / updated_at – метки времени.
+    """
+    conn = sqlite3.connect("users.db")          # тот же файл, что и для users
+    c = conn.cursor()
+
+    # -- сама таблица -------------------------------------------------------
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS crawler_requests (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id       INTEGER    NOT NULL,
+            task_id       TEXT       NOT NULL UNIQUE,
+            start_url     TEXT       NOT NULL,
+            payload_json  TEXT       NOT NULL,
+            status        TEXT       NOT NULL DEFAULT 'in progress',
+            result_path   TEXT,
+            created_at    TIMESTAMP  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at    TIMESTAMP  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    """)
+
+    # -- индекс для быстрой выдачи «истории» пользователя -------------------
+    c.execute("""
+        CREATE INDEX IF NOT EXISTS idx_crawler_user_created
+        ON crawler_requests (user_id, created_at DESC)
+    """)
+
+    conn.commit()
+    conn.close()
+
+init_history_table()
 
 # === JWT генерация и проверка ===
 def create_token(user_id: int, token_type="access"):
@@ -113,7 +186,7 @@ def login(data: dict):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     user_id = result[0]
-    access_token, _ = create_token(user_id, "access")
+    access_token, access_exp = create_token(user_id, "access")
     refresh_token, refresh_exp = create_token(user_id, "refresh")
 
     # Проверяем, сколько у пользователя уже refresh-токенов
@@ -134,7 +207,8 @@ def login(data: dict):
 
     return {
         "access_token": access_token,
-        "refresh_token": refresh_token
+        "refresh_token": refresh_token,
+        "access_expires": int(access_exp.timestamp())    # Unix-сек
     }
 
 @router.post("/refresh")

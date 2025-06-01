@@ -110,13 +110,14 @@ export class CrawlerRequest {
      * 
      * @returns {Promise}
      */
-    async sendParsingTask() {
+    async sendParsingTask(token = undefined) {
         const apiUrl = 'http://localhost:8000/start_crawler';
         try {
             const response = await fetch(apiUrl, {
                 method: "POST",
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Authorization': token ? `Bearer ${token}` : undefined,
                 },
                 body: JSON.stringify({
                     start_url: this.start_url,
