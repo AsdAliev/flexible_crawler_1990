@@ -1,4 +1,5 @@
 // indexedDB wrapper for storing request history
+
 const DB_NAME = 'requestHistoryDB';
 const DB_VERSION = 1;
 const STORE_NAME = 'requests';
@@ -28,9 +29,7 @@ export async function addRequest(entry) {
     return new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, 'readwrite');
         const store = tx.objectStore(STORE_NAME);
-        if (!entry.createdAt) {
-            entry.createdAt = Date.now();
-        }
+        if (!entry.createdAt) entry.createdAt = Date.now();
         const req = store.add(entry);
         req.onsuccess = () => resolve();
         req.onerror = e => reject(e.target.error);
@@ -48,7 +47,6 @@ export async function updateStatus(id, newStatus) {
         const tx = db.transaction(STORE_NAME, 'readwrite');
         const store = tx.objectStore(STORE_NAME);
         const getReq = store.get(id);
-
         getReq.onsuccess = () => {
             const data = getReq.result;
             if (!data) return reject(new Error('Запись не найдена'));
@@ -57,7 +55,6 @@ export async function updateStatus(id, newStatus) {
             putReq.onsuccess = () => resolve();
             putReq.onerror = e => reject(e.target.error);
         };
-
         getReq.onerror = e => reject(e.target.error);
     });
 }

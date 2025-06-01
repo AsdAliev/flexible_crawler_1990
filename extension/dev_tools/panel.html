@@ -17,6 +17,24 @@
             <label for="request-name-input" class="form-label">Имя запроса</label>
             <input id="request-name-input" type="text" class="form-control">
         </div>
+
+        <div class="input-group mb-3">
+            <div class="form-floating">
+                <input type="url" class="form-control" id="request-main-url" placeholder="URL" value="" readonly>
+                <label for="floatingPlaintextInput">URL запроса</label>
+            </div>
+            <button class="btn btn-outline-secondary" type="button" id="refresh-url-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                    class="bi bi-arrow-clockwise" viewBox="0 0 16 16">
+                    <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z">
+                    </path>
+                    <path
+                        d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466">
+                    </path>
+                </svg>
+            </button>
+        </div>
+
         <div class="form-check mb-3">
             <input class="form-check-input" type="checkbox" id="enable-pagination">
             <label class="form-check-label" for="enable-pagination">
@@ -51,12 +69,16 @@
                 </div>
             </div>
             <div id="pagination-query-param" style="display: none;">
-                <div class="form-floating mb-2">
+                <div class="form-floating mb-1">
                     <input id="pagination-query-param-input" type="text" class="form-control"
                         placeholder="start_id={id}">
                     <label for="pagination-query-param-input">Параметр номера страницы</label>
                 </div>
-                <div class="form-floating">
+                <!-- <datalist id="datalist-url-param">
+                    </datalist> -->
+                <div id="datalist-url-param" class="list-group d-none"
+                    style="max-height: 400px; overflow-y: scroll; scrollbar-width: thin;"></div>
+                <div class="form-floating mt-3">
                     <input id="pagination-query-param-increment" type="text" class="form-control" value="1"
                         placeholder="1">
                     <label for="pagination-query-param-increment">Увеличение параметра</label>

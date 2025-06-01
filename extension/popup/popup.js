@@ -43,6 +43,7 @@ function setupNavbar() {
             }, 3000);
             document.getElementById('profile-nav').textContent = `Профиль(${User.Name})`;
             document.getElementById('profile-log-nav').textContent = "Выйти";
+            fillRequestList();
             activateRequestPage();
         } else {
             const errorDiv = document.getElementById("login-error");
@@ -94,6 +95,7 @@ function activateSettingsPage() {
 async function activateProfileLoginPage() {
     if (User.isAuthenticated) {
         await User.logoutUser();
+        fillRequestList();
         document.getElementById('profile-log-nav').textContent = "Войти";
         document.getElementById('profile-nav').textContent = 'Профиль';
     }

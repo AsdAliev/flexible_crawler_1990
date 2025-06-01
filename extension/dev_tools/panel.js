@@ -1,4 +1,6 @@
 import { getCssSelector, getXPath } from "./path-suggest.js";
+import { getToken } from "../popup/user.js";
+import * as userRequest from "../storage/user-request-storage.js";
 import {
     PathData, Attribute, ObjectMeta,
     PaginationSettings, CrawlerSettings, CrawlerRequest
@@ -32,6 +34,14 @@ document.getElementById('request-name-input').addEventListener('focus',
         FormHelper.prevPath.isRel = null;
     }
 );
+
+document.getElementById('next-pagination-elem-path').addEventListener('focus', () => {
+    FormHelper.prevPath.input?.classList.remove('border-primary');
+    FormHelper.prevPath.input = document.getElementById('next-pagination-elem-path');
+    FormHelper.prevPath.input.classList.add('border-primary');
+    FormHelper.prevPath.type = document.getElementById('pagination-path-type');
+    FormHelper.prevPath.isRel = true;
+});
 
 const parseForm = document.getElementById('parse-form');
 const FormHelper = {
@@ -216,18 +226,23 @@ parseForm.addEventListener('submit', (e) => {
 
 async function sendParseRequest() {
     try {
-        const start_url = (await chrome.runtime.sendMessage({ action: "getActiveTab" }))?.url; // TODO
+        const start_url = document.getElementById('request-main-url').value;
         const objectMeta = getRequestMeta();
         const parse_settings = getParseSettings();
 
         const req = new CrawlerRequest(start_url, parse_settings, objectMeta);
         console.log(req.toJSON());
-
-        const answer = await req.sendParsingTask();
+        const token = await getToken()
+        const answer = await req.sendParsingTask(token ? token : undefined);
         const reqId = answer.task_id;
         const reqStatus = answer.status;
-
-        requestDB.addRequest({
+        let localOrApi;
+        if (!token) {
+            localOrApi = requestDB;
+        } else {
+            localOrApi = userRequest;
+        }
+        localOrApi.addRequest({
             id: reqId,
             status: reqStatus,
             name: document.getElementById('request-name-input').value.trim(),
@@ -261,7 +276,7 @@ document.getElementById('clear-form-btn').addEventListener('click', () => {
     }
 });
 
-function setupParseSettings() {
+async function setupParseSettings() {
     const enablePagination = document.getElementById('enable-pagination');
     enablePagination.addEventListener('change', () => {
         if (enablePagination.checked) {
@@ -281,7 +296,68 @@ function setupParseSettings() {
             document.getElementById('pagination-query-param').style.display = 'block';
         }
     });
+
+    document.getElementById('request-main-url').value = (await chrome.runtime.sendMessage({ action: "getActiveTab" }))?.url;
+    fillDatalistFromUrl(document.getElementById('request-main-url').value);
+    document.getElementById('refresh-url-btn').addEventListener('click', async () => {
+        document.getElementById('request-main-url').value = (await chrome.runtime.sendMessage({ action: "getActiveTab" }))?.url;
+        fillDatalistFromUrl(document.getElementById('request-main-url').value);
+    });
+    document.getElementById('pagination-query-param-input').addEventListener('focus', () => {
+        document.getElementById('datalist-url-param').classList.remove('d-none');
+    });
+    document.getElementById('pagination-query-param-input').addEventListener('blur', () => {
+        setTimeout(() => { document.getElementById('datalist-url-param').classList.add('d-none'); }, 100);
+    });
+    document.getElementById('pagination-query-param-input').addEventListener('input', () => {
+        filterDatalist();
+    });
 }
+
+function filterDatalist() {
+    const inputEl = document.getElementById('pagination-query-param-input');
+    const datalist = document.getElementById('datalist-url-param');
+    const filter = inputEl.value.toLowerCase();
+    datalist.childNodes.forEach(li => {
+        li.classList.toggle('d-none', !li.textContent.toLowerCase().includes(filter));
+    });
+}
+
+/**
+   * Parses the given URL string and fills the datalist with param=value options.
+   * @param {string} urlString - The full URL containing query parameters.
+   */
+function fillDatalistFromUrl(urlString) {
+    const datalist = document.getElementById('datalist-url-param');
+    if (!datalist) {
+        console.error('No datalist found with id="datalist-url-param"');
+        return;
+    }
+
+    // Clear any existing options
+    datalist.innerHTML = '';
+
+    let url;
+    try {
+        url = new URL(urlString);
+    } catch (e) {
+        console.error('Invalid URL:', urlString);
+        return;
+    }
+
+    // Iterate over each query parameter
+    for (const [key, value] of url.searchParams) {
+        const option = document.createElement('button');
+        option.classList.add('list-group-item', 'list-group-item-action');
+        option.textContent = `${key}=${value}`;
+        option.type = 'button';
+        option.addEventListener('click', () => {
+            document.getElementById('pagination-query-param-input').value = option.textContent.split('=')[0] + '={page_number}';
+        });
+        datalist.appendChild(option);
+    }
+}
+
 
 /**
  * 
