@@ -6,7 +6,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
       build-essential gcc libffi-dev libssl-dev \
       libxml2-dev libxslt1-dev zlib1g-dev \
-      librdkafka-dev && \
+      librdkafka-dev curl && \
     rm -rf /var/lib/apt/lists/*
 
 # 2) Пакеты Python
@@ -16,13 +16,19 @@ RUN pip install --no-cache-dir scrapyd scrapyd-client confluent-kafka
 WORKDIR /app
 COPY flex_crawler/ /app/flex_crawler/
 COPY flex_crawler/setup.py /app/setup.py
-RUN pip install --no-cache-dir -e /app
+RUN pip install --no-cache-dir -e .
 
 # 4) Конфиг Scrapyd
 COPY scrapyd/scrapyd.conf /etc/scrapyd/scrapyd.conf
 
-# 5) Точки монтирования для persistence
+# 5) Копируем наш entrypoint-скрипт
+COPY scrapyd/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# 6) Точки монтирования
 VOLUME /scrapyd/eggs /scrapyd/logs /scrapyd/items
 
 EXPOSE 6800
-CMD ["scrapyd"]
+
+# 7) Запуск через entrypoint.sh вместо прямого scrapyd
+ENTRYPOINT ["/entrypoint.sh"]

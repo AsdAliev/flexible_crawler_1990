@@ -1,84 +1,139 @@
-import os, json, requests
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
-from pydantic import BaseModel
+import os
+import json
 from typing import Literal
 
-SCRAPYD_URL  = os.getenv("SCRAPYD_URL")
-PROJECT_NAME = os.getenv("PROJECT_NAME")
-ITEMS_DIR    = os.getenv("ITEMS_DIR")
+import requests
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="Crawler Facade", version="1.0")
+from authorization import router as auth_router
+from models import CrawlerRequest
+from utils import (
+    read_items_from_jl,
+    write_json_file,
+    write_csv_file,
+    write_xml_file,
+)
 
-class CrawlerRequest(BaseModel):
-    start_url: str
-    crawler_settings: dict
-    meta: list[dict]
+app = FastAPI(
+    title="Flexible Crawler API",
+    description="API для запуска и получения результата гибкого краулера на базе Scrapy + Scrapyd",
+    version="1.2.0"
+)
+
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # лучше явно указывать допустимые origin (фронтенд, расширение, и т.д.)
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Подключаем маршруты из auth.py
+app.include_router(auth_router)
+
+SCRAPYD_URL = os.getenv("SCRAPYD_URL", "http://localhost:6800")
+PROJECT_NAME = os.getenv("PROJECT_NAME", "flex_crawler")
+ITEMS_DIR = os.getenv("ITEMS_DIR", "/scrapyd/items")
+
+
+@app.get("/")
+def read_root():
+    return {"message": "Flexible Crawler API is running"}
+
 
 @app.post("/jobs/", status_code=201)
 def schedule_job(req: CrawlerRequest):
     payload = {
         "project": PROJECT_NAME,
-        "spider":  "flexible_spider",
-        "config":  json.dumps(req.dict(), ensure_ascii=False),
+        "spider": "flexible_spider",
+        "config": json.dumps(req.dict(), ensure_ascii=False),
     }
-    r = requests.post(f"{SCRAPYD_URL}/schedule.json", data=payload)
-    d = r.json()
-    if d.get("status") != "ok":
-        raise HTTPException(500, "Не удалось запланировать spider")
-    return {"jobid": d["jobid"]}
+    try:
+        resp = requests.post(f"{SCRAPYD_URL}/schedule.json", data=payload, timeout=5)
+    except requests.RequestException as e:
+        raise HTTPException(status_code=502, detail=f"Ошибка связи с Scrapyd: {e}")
+
+    if resp.status_code != 200:
+        raise HTTPException(status_code=resp.status_code, detail="Scrapyd вернул ошибку")
+
+    data = resp.json()
+    if data.get("status") != "ok" or "jobid" not in data:
+        raise HTTPException(status_code=500, detail="Не удалось запланировать spider")
+
+    return JSONResponse(status_code=201, content={"jobid": data["jobid"]})
+
 
 @app.get("/jobs/{jobid}/status")
 def job_status(jobid: str):
-    r = requests.get(f"{SCRAPYD_URL}/listjobs.json", params={"project": PROJECT_NAME})
-    jobs = r.json()
-    for st in ("pending", "running"):
-        if any(j["id"] == jobid for j in jobs.get(st, [])):
-            return {"jobid": jobid, "status": st}
-    if any(j["id"] == jobid for j in jobs.get("finished", [])):
-        return {"jobid": jobid, "status": "finished"}
-    raise HTTPException(404, "Job not found")
+    try:
+        resp = requests.get(
+            f"{SCRAPYD_URL}/listjobs.json",
+            params={"project": PROJECT_NAME},
+            timeout=5,
+        )
+    except requests.RequestException as e:
+        raise HTTPException(status_code=502, detail=f"Ошибка связи с Scrapyd: {e}")
+
+    if resp.status_code != 200:
+        raise HTTPException(status_code=resp.status_code, detail="Scrapyd вернул ошибку")
+
+    jobs = resp.json()
+    for state in ("pending", "running", "finished"):
+        if any(j["id"] == jobid for j in jobs.get(state, [])):
+            return {"jobid": jobid, "status": state}
+
+    raise HTTPException(status_code=404, detail="Job not found")
+
 
 @app.get("/jobs/{jobid}/result")
-def job_result(jobid: str, format: Literal["json","csv","xml"]="json"):
-    status = job_status(jobid)["status"]
+def job_result(jobid: str, output_format: Literal["json", "csv", "xml"] = "json"):
+    # Проверяем статус задачи
+    status_resp = job_status(jobid)
+    status = status_resp.get("status")
     if status != "finished":
-        return {"jobid": jobid, "status": status}
+        return JSONResponse(
+            status_code=202,
+            content={"jobid": jobid, "status": status, "message": "Job not finished yet"},
+        )
 
-    jl = os.path.join(ITEMS_DIR, PROJECT_NAME, "flexible_spider", f"{jobid}.jl")
-    if not os.path.exists(jl):
-        raise HTTPException(404, "Result file not found")
-    items = [json.loads(l) for l in open(jl, encoding="utf-8")]
+    jl_path = os.path.join(
+        ITEMS_DIR, PROJECT_NAME, "flexible_spider", f"{jobid}.jl"
+    )
+    if not os.path.exists(jl_path):
+        raise HTTPException(status_code=404, detail="Result file not found")
 
-    if format == "json":
-        tmp = f"/tmp/{jobid}.json"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(items, f, ensure_ascii=False, indent=2)
-        return FileResponse(tmp, filename=f"{jobid}.json")
+    try:
+        items = read_items_from_jl(jl_path)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Result file not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка при чтении результатов: {e}")
 
-    if format == "csv":
-        import csv
-        from flex_crawler.pipelines import flatten_selected_fields  # или ваш util
-        rows = [flatten_selected_fields(i) for i in items]
-        keys = sorted({k for r in rows for k in r})
-        tmp = f"/tmp/{jobid}.csv"
-        with open(tmp, "w", newline="", encoding="utf-8") as f:
-            w = csv.DictWriter(f, keys)
-            w.writeheader()
-            w.writerows(rows)
-        return FileResponse(tmp, filename=f"{jobid}.csv")
+    tmp_base = f"/tmp/{jobid}"
 
-    if format == "xml":
-        import xml.etree.ElementTree as ET, xml.dom.minidom as md
-        from flex_crawler.pipelines import dict_to_xml
-        root = ET.Element("items")
-        for it in items:
-            el = ET.SubElement(root, "item")
-            dict_to_xml(el, it)
-        rough = ET.tostring(root, encoding="utf-8")
-        pretty = md.parseString(rough).toprettyxml(indent="  ", encoding="utf-8")
-        tmp = f"/tmp/{jobid}.xml"
-        with open(tmp, "wb") as f: f.write(pretty)
-        return FileResponse(tmp, filename=f"{jobid}.xml")
+    if output_format == "json":
+        out_path = tmp_base + ".json"
+        try:
+            write_json_file(items, out_path)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Ошибка при создании JSON: {e}")
+        return FileResponse(out_path, filename=f"{jobid}.json", media_type="application/json")
 
-    raise HTTPException(400, "Unsupported format")
+    if output_format == "csv":
+        out_path = tmp_base + ".csv"
+        try:
+            write_csv_file(items, out_path)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Ошибка при создании CSV: {e}")
+        return FileResponse(out_path, filename=f"{jobid}.csv", media_type="text/csv")
+
+    # format == "xml"
+    out_path = tmp_base + ".xml"
+    try:
+        write_xml_file(items, out_path)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка при создании XML: {e}")
+    return FileResponse(out_path, filename=f"{jobid}.xml", media_type="application/xml")
