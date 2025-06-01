@@ -1,4 +1,6 @@
 import { getCssSelector, getXPath } from "./path-suggest.js";
+import { getToken } from "../popup/user.js";
+import * as userRequest from "../storage/user-request-storage.js";
 import {
     PathData, Attribute, ObjectMeta,
     PaginationSettings, CrawlerSettings, CrawlerRequest
@@ -230,12 +232,17 @@ async function sendParseRequest() {
 
         const req = new CrawlerRequest(start_url, parse_settings, objectMeta);
         console.log(req.toJSON());
-
-        const answer = await req.sendParsingTask();
+        const token = await getToken()
+        const answer = await req.sendParsingTask(token ? token : undefined);
         const reqId = answer.task_id;
         const reqStatus = answer.status;
-
-        requestDB.addRequest({
+        let localOrApi;
+        if (!token) {
+            localOrApi = requestDB;
+        } else {
+            localOrApi = userRequest;
+        }
+        localOrApi.addRequest({
             id: reqId,
             status: reqStatus,
             name: document.getElementById('request-name-input').value.trim(),

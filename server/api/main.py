@@ -105,18 +105,19 @@ def start_crawler(data: CrawlerRequest, background_tasks: BackgroundTasks, user 
     with status_lock:
         task_data[task_id] = {"status": "in progress", "format": "json"}
     # ▸ Пишем строку в crawler_requests -----------------------------------
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute(
-            """
-            INSERT INTO crawler_requests
-                  (user_id, task_id, start_url, payload_json)
-            VALUES (?, ?, ?, ?)
-            """,
-            (user["id"],                # гарантирует, что задача «чья-то»
-             task_id,
-             data.start_url,
-             data.model_dump_json())
-        )
+    if user is not None:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute(
+                """
+                INSERT INTO crawler_requests
+                      (user_id, task_id, start_url, payload_json)
+                VALUES (?, ?, ?, ?)
+                """,
+                (user["id"],                # гарантирует, что задача «чья-то»
+                 task_id,
+                 data.start_url,
+                 data.model_dump_json())
+            )
         
 
     # Запускаем Scrapy через subprocess, передавая нужные аргументы

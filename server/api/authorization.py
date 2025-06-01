@@ -3,6 +3,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import sqlite3, bcrypt, jwt
 from datetime import datetime, timedelta
 from fastapi import APIRouter
+from typing import Optional
 
 router = APIRouter()
 
@@ -15,7 +16,7 @@ REFRESH_TOKEN_EXP_DAYS = 7
 
 # === Init FastAPI & Auth ===
 app = FastAPI()
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 # === Хранилище отозванных access-токенов ===
 revoked_tokens = set()
@@ -24,8 +25,16 @@ revoked_tokens = set()
 # DEPENDENCY: current logged-in user
 # ────────────────────────────────────────────────────────────────
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)
 ) -> dict:
+    """
+    Если нет заголовка Authorization или токен невалиден, сразу возвращаем None.
+    Иначе — возвращаем {"id":…, "username":…}.
+    """
+    if credentials is None:
+        # Нет Authorization-заголовка → считаем неавторизованным, возвращаем None
+        return None
+    
     """Возвращает {'id': …, 'username': …} для валидного access-токена."""
     user_id = verify_token(credentials.credentials)          # проверяем JWT
 
@@ -77,7 +86,7 @@ def init_history_table() -> None:
     • task_id – строковый идентификатор задачи в Scrapy/планировщике;
     • start_url – URL, с которого начали краулинг;
     • payload_json – исходная конфигурация паука (храним целиком);
-    • status – текущее состояние (‘in_progress’, ‘completed’, ‘error’);
+    • status – текущее состояние (‘in progress’, ‘completed’, ‘error’);
     • result_path – относительный путь к сохранённому файлу результата;
     • created_at / updated_at – метки времени.
     """
@@ -92,7 +101,7 @@ def init_history_table() -> None:
             task_id       TEXT       NOT NULL UNIQUE,
             start_url     TEXT       NOT NULL,
             payload_json  TEXT       NOT NULL,
-            status        TEXT       NOT NULL DEFAULT 'in_progress',
+            status        TEXT       NOT NULL DEFAULT 'in progress',
             result_path   TEXT,
             created_at    TIMESTAMP  NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at    TIMESTAMP  NOT NULL DEFAULT CURRENT_TIMESTAMP,

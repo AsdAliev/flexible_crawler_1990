@@ -18,14 +18,14 @@ export async function getToken() {
     return new Promise(async resolve => {
         const token = localStorage.getItem('access_token');
 
-    const exp = Number(localStorage.getItem('access_token_exp') || 0);
-    const now = Date.now() / 1000;
-    if (!token || (exp && now >= exp)) {
-        // пробуем «тихо» обновить
-        const ok = await tryRefresh();
-        if (!ok) return resolve(null);           // refresh не сработал
-        return resolve(localStorage.getItem('access_token'));
-    }
+        const exp = Number(localStorage.getItem('access_token_exp') || 0);
+        const now = Date.now() / 1000;
+        if (!token || (exp && now >= exp)) {
+            // пробуем «тихо» обновить
+            const ok = await tryRefresh();
+            if (!ok) return resolve(null);           // refresh не сработал
+            return resolve(localStorage.getItem('access_token'));
+        }
 
         resolve(token || null);
     });
@@ -33,10 +33,9 @@ export async function getToken() {
 
 
 export async function checkAuth() {
-    const token = localStorage.getItem("access_token");
-    const refreshToken = localStorage.getItem("refresh_token");
+    const token = await getToken();
 
-    if (!token || !refreshToken) {
+    if (!token) {
         isAuthenticated = false;
         Name = null;
         return false;
@@ -200,30 +199,31 @@ export async function logoutUser() {
     // Очищаем локальные токены СРАЗУ
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
+    localStorage.removeItem("access_token_exp");
     isAuthenticated = false;
     Name = null;
 }
 
-export async function tryRefresh () {
-  const refreshToken = localStorage.getItem('refresh_token');
-  if (!refreshToken) return false;                // нечем обновлять
+export async function tryRefresh() {
+    const refreshToken = localStorage.getItem('refresh_token');
+    if (!refreshToken) return false;                // нечем обновлять
 
-  const res = await fetch('http://localhost:8000/refresh', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refresh_token: refreshToken }),
-  });
+    const res = await fetch('http://localhost:8000/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+    });
 
-  if (!res.ok) {                                  // refresh недействителен
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    localStorage.removeItem('access_token_exp');
-    return false;
-  }
+    if (!res.ok) {                                  // refresh недействителен
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('access_token_exp');
+        return false;
+    }
 
-  const data = await res.json();                  // {access_token, refresh_token, access_expires}
-  localStorage.setItem('access_token',      data.access_token);
-  localStorage.setItem('refresh_token',     data.refresh_token);
-  localStorage.setItem('access_token_exp',  data.access_expires);
-  return true;
+    const data = await res.json();                  // {access_token, refresh_token, access_expires}
+    localStorage.setItem('access_token', data.access_token);
+    localStorage.setItem('refresh_token', data.refresh_token);
+    localStorage.setItem('access_token_exp', data.access_expires);
+    return true;
 }

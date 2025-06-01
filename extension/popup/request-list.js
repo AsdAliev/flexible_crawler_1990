@@ -1,12 +1,28 @@
 import * as requestDB from '../storage/request-storage.js';
 import { CrawlerRequest } from '../dev_tools/api-classes.js';
 import { appSettings } from '../app-settings.js';
-import { showResultPage } from '../result-page/result-page.js'
+import { showResultPage } from '../result-page/result-page.js';
+import * as userRequests from '../storage/user-request-storage.js';
+import * as User from './user.js';
+
+/** @type {requestDB} */
+let requestHandler;
+
+if (await User.checkAuth()) {
+    requestHandler = userRequests;
+} else {
+    requestHandler = requestDB;
+}
 
 export async function fillRequestList() {
+    if (await User.checkAuth()) {
+        requestHandler = userRequests;
+    } else {
+        requestHandler = requestDB;
+    }
     const reqList = document.getElementById('requests-container__list');
     reqList.innerHTML = '';
-    const reqs = await requestDB.getRecentRequests();
+    const reqs = await requestHandler.getRecentRequests();
     console.log(reqs);
 
     if (reqs.length) {
@@ -21,6 +37,7 @@ export async function fillRequestList() {
  * @returns 
  */
 function createRequestCard(request) {
+    console.log(request.status);
     const card = document.createElement('li');
     let intId = null;
     card.classList.add('list-group-item', 'd-flex', 'justify-content-between', 'align-items-start');
@@ -58,26 +75,32 @@ function createRequestCard(request) {
     });
     cardLinks[1].addEventListener('click', async () => {
         try {
+            const token = await User.getToken();
             const req = new CrawlerRequest(request.request.start_url, request.request.crawler_settings, request.request.meta);
             console.log(req.toJSON());
 
-            const answer = await req.sendParsingTask();
+            const answer = await req.sendParsingTask(token ? token : undefined);
             const reqId = answer.task_id;
             const reqStatus = answer.status;
 
-            requestDB.addRequest({
-                id: reqId,
-                status: reqStatus,
-                name: request.name,
-                request: req
-            }).then(
-                () => {
-                    const reqList = document.getElementById('requests-container__list');
-                    requestDB.getRequestById(reqId).then(req => {
-                        reqList.insertBefore(createRequestCard(req), reqList.firstChild);
-                    });
-                }
-            );
+            if (!token) {
+                console.log(req.toJSON());
+                requestHandler.addRequest({
+                    id: reqId,
+                    status: reqStatus,
+                    name: request.name,
+                    request: req
+                }).then(
+                    () => {
+                        const reqList = document.getElementById('requests-container__list');
+                        requestHandler.getRequestById(reqId).then(req => {
+                            reqList.insertBefore(createRequestCard(req), reqList.firstChild);
+                        });
+                    }
+                );
+            } else {
+                fillRequestList();
+            }
         }
         catch (error) {
             console.log(error);
@@ -86,8 +109,9 @@ function createRequestCard(request) {
     cardLinks[2].addEventListener('click', () => {
         getResult(request.id, appSettings.downloadType, request.name);
     });
-    cardLinks[3].addEventListener('click', () => {
-        requestDB.deleteRequest(request.id);
+    cardLinks[3].addEventListener('click', async () => {
+        const token = await User.getToken();
+        requestHandler.deleteRequest(token ? request.DBid : request.id);
         if (intId) {
             clearInterval(intId);
         }
@@ -105,7 +129,7 @@ function createRequestCard(request) {
                     if (status === 'in progress' || status == 'crawler started') {
                         return;
                     } else if (status === 'completed') {
-                        requestDB.updateStatus(request.id, status);
+                        requestHandler.updateStatus(request.id, status);
                         card.querySelector('a').classList.remove('link-secondary');
                         card.querySelector('a').classList.add('link-success');
                         card.querySelector('span.badge').classList.remove('text-bg-warning');
