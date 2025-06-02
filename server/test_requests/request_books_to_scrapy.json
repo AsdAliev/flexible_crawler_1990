@@ -9,21 +9,19 @@
                 "path": "//li[@class='next']/a",
                 "selector_type": "xpath"
             },
-            "max_pages": 10
+            "max_pages": 2
         }
     },
     "meta": [
         {
-            "object_name": "book",
-            "object_caption": "Книга",
+            "object_name": "Книга",
             "object_selector": {
                 "path": "//article[@class='product_pod']",
                 "selector_type": "xpath"
             },
             "attributes": [
                 {
-                    "attribute_name": "name",
-                    "attribute_caption": "Название",
+                    "attribute_name": "Название",
                     "attribute_selector": {
                         "path": "./h3/a/@title",
                         "selector_type": "xpath"
@@ -31,8 +29,7 @@
                     "attribute_type": "simple"
                 },
                 {
-                    "attribute_name": "price",
-                    "attribute_caption": "Цена",
+                    "attribute_name": "Цена",
                     "attribute_selector": {
                         "path": ".//p[@class='price_color']/text()",
                         "selector_type": "xpath"
@@ -40,8 +37,7 @@
                     "attribute_type": "simple"
                 },
                 {
-                    "attribute_name": "availability",
-                    "attribute_caption": "Наличие",
+                    "attribute_name": "Наличие",
                     "attribute_selector": {
                         "path": ".//p[contains(@class, 'instock')]/text()",
                         "selector_type": "xpath"
@@ -49,8 +45,7 @@
                     "attribute_type": "simple"
                 },
                 {
-                    "attribute_name": "rating",
-                    "attribute_caption": "Рейтинг",
+                    "attribute_name": "Рейтинг",
                     "attribute_selector": {
                         "path": "./p[contains(@class, 'star-rating')]/@class",
                         "selector_type": "xpath"
@@ -58,8 +53,7 @@
                     "attribute_type": "simple"
                 },
                 {
-                    "attribute_name": "link",
-                    "attribute_caption": "Cтраница книги",
+                    "attribute_name": "Cтраница книги",
                     "attribute_selector": {
                         "path": "./h3/a/@href",
                         "selector_type": "xpath"
@@ -67,8 +61,7 @@
                     "attribute_type": "link",
                     "linked_attributes": [
                         {
-                            "attribute_name": "description",
-                            "attribute_caption": "Описание",
+                            "attribute_name": "Описание",
                             "attribute_selector": {
                                 "path": "//meta[@name='description']/@content",
                                 "selector_type": "xpath"
@@ -76,8 +69,7 @@
                             "attribute_type": "simple"
                         },
                         {
-                            "attribute_name": "category",
-                            "attribute_caption": "Категория",
+                            "attribute_name": "Категория",
                             "attribute_selector": {
                                 "path": "//ul[@class='breadcrumb']/li[3]/a/text()",
                                 "selector_type": "xpath"

@@ -9,14 +9,11 @@ from .utils import get_element_by_selector, extract_current_page_from_url
 class FlexibleSpider(scrapy.Spider):
     name = "flexible_spider"
 
-    def __init__(self, config_path, output_path, *args, **kwargs):
+    def __init__(self, config=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.config_path = config_path
-        self.output_path = output_path
 
-        if self.config_path and os.path.exists(self.config_path):
-            with open(self.config_path, "r", encoding="utf-8") as f:
-                self.config = json.load(f)
+        self.object_counter = 0  # Глобальный счетчик для ключей
+        self.config = json.loads(config) if config else {}
         self.allowed_domains = self.config.get('crawler_settings', {}).get('allowed_domains', all)
         self.start_page = None
 
@@ -31,38 +28,32 @@ class FlexibleSpider(scrapy.Spider):
         Поддерживаются типы: simple, array и nested.
         """
         attr_type = attr.get("attribute_type", "simple")
+
+        if attr_type == "nested":
+            nested_result = {}
+            for nested_attr in attr.get("nested_attributes", []):
+                # Рекурсивный вызов для вложенных атрибутов
+                nested_result[nested_attr.get("attribute_name")] = self.extract_attribute(element, nested_attr)
+            return nested_result
+        
+        selector_info = attr.get("attribute_selector", {})
+        path = selector_info.get("path", "")
+        selector_type = selector_info.get("selector_type", "xpath")
+        sub_elements = get_element_by_selector(element, path, selector_type)
+
         if attr_type == "simple":
-            selector_info = attr.get("attribute_selector", {})
-            path = selector_info.get("path", "")
-            selector_type = selector_info.get("selector_type", "xpath")
-            sub_elements = get_element_by_selector(element, path, selector_type)
             extracted = sub_elements.get()
             return extracted.strip() if extracted else None
 
         elif attr_type == "array":
-            selector_info = attr.get("attribute_selector", {})
-            path = selector_info.get("path", "")
-            selector_type = selector_info.get("selector_type", "xpath")
-            sub_elements = get_element_by_selector(element, path, selector_type)
-            all_values = [v.get().strip() for v in sub_elements if v.get()]
-            delimiter = attr.get("delimiter", ";")
-            return delimiter.join(all_values)
-
-        elif attr_type == "nested":
-            nested_result = {}
-            for nested_attr in attr.get("nested_attributes", []):
-                # Рекурсивный вызов для вложенных атрибутов
-                nested_result[nested_attr.get("attribute_caption")] = self.extract_attribute(element, nested_attr)
-            return nested_result
-
+            return [v.get().strip() for v in sub_elements if v.get()]
         # Для типа "link" возвращаем просто URL, а обработку ссылок оставляем в основном цикле
         elif attr_type == "link":
-            selector_info = attr.get("attribute_selector", {})
-            path = selector_info.get("path", "")
-            selector_type = selector_info.get("selector_type", "xpath")
-            sub_elements = get_element_by_selector(element, path, selector_type)
-            link = sub_elements.get("href")
-            return link
+            if sub_elements:
+                try:
+                    return sub_elements[0].attrib.get("href")
+                except:
+                    return sub_elements.get("href")
 
         else:
             return None
@@ -78,40 +69,29 @@ class FlexibleSpider(scrapy.Spider):
 
             elements = get_element_by_selector(response, object_path, object_selector_type)
             for element in elements:
-                item_data = {}
-                links_to_follow = []
+                self.object_counter += 1
+                item_data = {"Позиция в поиске": self.object_counter}
 
                 # Сначала обрабатываем все атрибуты, кроме типа "link"
                 for attr in obj.get("attributes", []):
                     attr_type = attr.get("attribute_type", "simple")
                     if attr_type != "link":
-                        item_data[attr.get("attribute_caption")] = self.extract_attribute(element, attr)
-
-                # Затем обрабатываем атрибуты типа "link" отдельно (их linked_attributes могут тоже быть вложенными)
-                for attr in obj.get("attributes", []):
-                    if attr.get("attribute_type") == "link":
+                        item_data[attr.get("attribute_name")] = self.extract_attribute(element, attr)
+                    
+                    elif attr.get("attribute_type") == "link":
                         link = self.extract_attribute(element, attr)
+                        
                         if link:
-                            links_to_follow.append({
-                                "link": link,
-                                "linked_attributes": attr.get("linked_attributes", []),
-                                "item_data": item_data.copy()
-                            })
-
-                if links_to_follow:
-                    remaining_links = len(links_to_follow)
-                    for link_info in links_to_follow:
-                        yield response.follow(
-                            link_info["link"],
-                            callback=self.parse_links,
-                            meta={
-                                "linked_attributes": link_info["linked_attributes"],
-                                "item_data": link_info["item_data"],
-                                "remaining_links": remaining_links
-                            }
-                        )
-                else:
-                    yield item_data
+                            yield response.follow(
+                                link,
+                                callback=self.parse_links,
+                                meta={
+                                    "linked_attributes": attr.get("linked_attributes", []),
+                                    "item_data": {"Позиция в поиске": self.object_counter}
+                                },
+                                dont_filter=True
+                            )
+                yield item_data
 
         # Логика пагинации (без изменений)
         pagination_settings = self.config.get("crawler_settings", {}).get("pagination", {})
@@ -159,14 +139,11 @@ class FlexibleSpider(scrapy.Spider):
 
     def parse_links(self, response):
         linked_attributes = response.meta.get("linked_attributes", [])
-        item_data = response.meta.get("item_data", {})
-        remaining_links = response.meta.get("remaining_links", 1) - 1
+        item_data = response.meta.get("item_data")
 
         for linked_attr in linked_attributes:
             # Здесь используем рекурсивную обработку для linked_attributes, предполагая, что они могут быть вложенными
-            item_data[linked_attr.get("attribute_caption")] = self.extract_attribute(response, linked_attr)
+            item_data[linked_attr.get("attribute_name")] = self.extract_attribute(response, linked_attr)
 
-        if remaining_links == 0:
-            yield item_data
-        else:
-            response.meta["remaining_links"] = remaining_links
+        yield item_data
+

@@ -1,59 +1,123 @@
-# Flexible Crawler API
+# Запуск проекта
 
-API для запуска гибкого краулера на базе Scrapy.
+Ниже приведена пошаговая инструкция по запуску всех сервисов из корня папки `server`.
 
-## Описание
-Этот проект предоставляет API для настройки и запуска веб-краулера, который собирает данные с сайтов, используя Scrapy. Настройки парсинга передаются в формате JSON, а результаты сохраняются в заданном формате (`json`, `csv`, `xml`).
+---
 
-## Требования
-- Python 3.11
-- Установленные зависимости из `requirements.txt`
-
-## Установка и запуск
-
-### 1. Клонирование репозитория
-```bash
-git clone https://git.miem.hse.ru/1990/main.git
-cd <repository_directory>
+## Структура директорий
+```
+server/
+├── api/
+│ ├── Dockerfile
+│ ├── main.py
+│ ├── models.py
+│ ├── requirements.txt
+│ └── utils.py
+│
+├── flex_crawler/
+│ ├── flex_crawler/
+│ │ ├── init.py
+│ │ ├── pipelines.py
+│ │ ├── settings.py
+│ │ └── spiders/
+│ │   ├── init.py
+│ │   └── flexible_spider.py
+│ │
+│ ├── scrapy.cfg
+│ └── setup.py
+│
+├── scrapyd/
+│ ├── Dockerfile
+│ ├── entrypoint.sh
+│ └── scrapyd.conf
+│
+├── docker-compose.yml
+└── .env
 ```
 
-### 2. Установка зависимостей
-Создайте виртуальное окружение (опционально):
-```bash
-python -m venv venv
-source venv/bin/activate  # Для Linux/macOS
-venv\Scripts\activate     # Для Windows
+- **api/** – FastAPI-приложение (эндпоинты для запуска и получения результатов краулера).  
+- **flex_crawler/** – Scrapy-проект, включающий пайплайны и spiders.  
+- **scrapyd/** – конфигурация и скрипт для автоматического деплоя spider’а в Scrapyd.  
+- **docker-compose.yml** – объединённая конфигурация сервисов: Zookeeper, Kafka, Scrapyd и API.  
+- **.env** – файл с переменными окружения.
+
+---
+
+## Файл .env
+
+Создайте в корне папки `server` файл `.env` со следующим содержимым (при необходимости замените значения):
+
+```ini
+# .env
+
+# URL Scrapyd (для API)
+SCRAPYD_URL=http://scrapyd:6800
+
+# Имя Scrapy-проекта (совпадает с project в scrapy.cfg)
+PROJECT_NAME=flex_crawler
+
+# Путь, где Scrapyd сохраняет .jl-файлы (volume /scrapyd/items)
+ITEMS_DIR=/scrapyd/items
+
+# Адрес Kafka-брокера, используемый в пайплайне
+KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+
+# Название топика для сообщений из KafkaPipeline
+KAFKA_TOPIC=crawler_results
+```
+---
+
+## Запуск всех сервисов
+Откройте терминал в папке server (WSL/Ubuntu или Linux).
+
+Убедитесь, что файл .env находится в той же директории, что и docker-compose.yml.
+
+Выполните:
+```
+docker-compose up -d --build
 ```
 
-Установите зависимости:
-```bash
-pip install -r requirements.txt
+Проверьте статус:
+```
+docker-compose ps
+```
+Должны быть четыре сервиса:
+- zookeeper (порт 2181)
+- kafka (порты 9092/9093)
+- scrapyd (порт 6800)
+- api (порт 8000)
+
+---
+
+## Полезные команды
+
+- Остановить и удалить все контейнеры, сети и тома:
+```
+docker-compose down --volumes
 ```
 
-### 3. Запуск API
-Запустите сервер FastAPI:
-```bash
-python main.py
+- Пересобрать и запустить только сервис `name`:
+```
+docker-compose build <name>
+docker-compose up -d <name>
 ```
 
-По умолчанию сервер будет доступен по адресу: [http://localhost:8000](http://localhost:8000).
-
-
-### 4. Тестирование API
-
-Пока что можно менять настройки обхода сайта можно вручную, изменяя файл request.json
-
-Запустите краулер:
-```bash
-python send_request.py
+- Посмотреть логи конкретного сервиса `name`:
+```
+docker-compose logs -f <name>
 ```
 
-Чтобы получить результат нужно выполнить скрипт:
-```bash
-python get_result.py
+- Войти в shell контейнера `name`:
 ```
-И ввести номер task_id, который был показан на прошлом шаге, если все было успешно
+docker-compose exec <name> sh
+```
 
-## Результаты
-Все результаты сохраняются в папке `results`, которая автоматически создаётся при первом запуске.
+- Проверить папку с egg-файлами внутри scrapyd:
+```
+docker-compose exec scrapyd sh -c "ls -R /scrapyd/eggs"
+```
 
+- Просмотреть содержимое тома scrapyd_items на хосте:
+```
+docker run --rm -v server_scrapyd_items:/data busybox ls -R /data
+```

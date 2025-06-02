@@ -1,51 +1,27 @@
-import subprocess
 import os
-import uuid
 import json
-import csv
-import xml.etree.ElementTree as ET
-
-from threading import Lock
+import datetime as dt
 from typing import Literal
 
-import uvicorn
-
-from fastapi import FastAPI, BackgroundTasks
+import requests
+import sqlite3
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.responses import FileResponse, JSONResponse
-
-from models import CrawlerRequest
-
 from fastapi.middleware.cors import CORSMiddleware
-from authorization import router as auth_router 
 
-import json, sqlite3, datetime as dt
-from fastapi import Depends
-from authorization import get_current_user    # <- уже существует в authorization.py
-
-DB_PATH = "users.db"          # тот же файл, где уже лежит таблица users
-
-def _history_update(task_id: str, **cols) -> None:
-    """
-    Обновляет любые поля записи в crawler_requests.
-    Пример: _history_update(task_id, status='completed', result_path='results/...')
-    """
-    if not cols:
-        return
-    sets = ", ".join(f"{k}=?" for k in cols)           # status=?, result_path=? …
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute(
-            f"""
-            UPDATE crawler_requests
-               SET {sets},
-                   updated_at=?
-             WHERE task_id=?""",
-            list(cols.values()) + [dt.datetime.utcnow(), task_id],
-        )
-
+from authorization import get_current_user, router as auth_router
+from models import CrawlerRequest
+from history import router as history_router
+from utils import (
+    read_items_from_jl,
+    write_json_file,
+    write_csv_file,
+    write_xml_file,
+)
 
 app = FastAPI(
     title="Flexible Crawler API",
-    description="API для запуска гибкого краулера на базе Scrapy",
+    description="API для запуска и получения результата гибкого краулера на базе Scrapy + Scrapyd",
     version="1.2.0"
 )
 
@@ -58,19 +34,33 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Подключаем маршруты из auth.py
+# Подключаем маршруты
 app.include_router(auth_router)
+app.include_router(history_router)
 
-# Создание папок для промежуточных результатов
-RESULTS_DIR = os.path.join(os.path.dirname(__file__), "results")
-SCHEMAS_DIR = os.path.join(os.path.dirname(__file__), "schemas")
-for directory in [RESULTS_DIR, SCHEMAS_DIR]:
-    if not os.path.exists(directory):
-        os.makedirs(directory)
+SCRAPYD_URL = os.getenv("SCRAPYD_URL", "http://localhost:6800")
+PROJECT_NAME = os.getenv("PROJECT_NAME", "flex_crawler")
+ITEMS_DIR = os.getenv("ITEMS_DIR", "/scrapyd/items")
+DB_PATH = "users.db"
 
-# Словарь для хранения статусов задачи и формата выходного файла
-task_data = {}
-status_lock = Lock()
+
+def _history_update(task_id: str, **cols) -> None:
+    """
+    Обновляет любые поля записи в crawler_requests.
+    Пример: _history_update(task_id, status='completed', result_path='results/...')
+    """
+    if not cols:
+        return
+    sets = ", ".join(f"{k}=?" for k in cols)  # status=?, result_path=? …
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            f"""
+            UPDATE crawler_requests
+               SET {sets},
+                   updated_at=?
+             WHERE task_id=?""",
+            list(cols.values()) + [dt.datetime.utcnow(), task_id],
+        )
 
 
 @app.get("/")
@@ -78,33 +68,26 @@ def read_root():
     return {"message": "Flexible Crawler API is running"}
 
 
-@app.post("/start_crawler")
-def start_crawler(data: CrawlerRequest, background_tasks: BackgroundTasks, user = Depends(get_current_user)):
-    """
-    Эндпоинт для запуска краулера.
-    Принимает JSON с параметрами парсинга (start_url, crawler_settings, meta).
-    """
+@app.post("/jobs/", status_code=201)
+def schedule_job(req: CrawlerRequest, user=Depends(get_current_user)):
+    payload = {
+        "project": PROJECT_NAME,
+        "spider": "flexible_spider",
+        "config": json.dumps(req.dict(), ensure_ascii=False),
+    }
 
-    # Генерируем уникальный ID задачи
-    task_id = str(uuid.uuid4())
+    try:
+        resp = requests.post(f"{SCRAPYD_URL}/schedule.json", data=payload, timeout=5)
+    except requests.RequestException as e:
+        raise HTTPException(status_code=502, detail=f"Ошибка связи с Scrapyd: {e}")
 
-    for directory in [RESULTS_DIR, SCHEMAS_DIR]:
-        if not os.path.exists(directory):
-            os.makedirs(directory)
+    if resp.status_code != 200:
+        raise HTTPException(status_code=resp.status_code, detail="Scrapyd вернул ошибку")
 
-    # Сохраняем полученный JSON во временный файл (или в базу) —
-    # затем паук сможет прочитать этот файл, чтобы знать, что именно парсить.
-    config_path = os.path.join(SCHEMAS_DIR, f"{task_id}_config.json")
-    with open(config_path, "w", encoding="utf-8") as f:
-        f.write(data.model_dump_json())
+    data = resp.json()
+    if data.get("status") != "ok" or "jobid" not in data:
+        raise HTTPException(status_code=500, detail="Не удалось запланировать spider")
 
-    # Результат будем складывать в файл с таким же Task ID
-    output_path = os.path.join(RESULTS_DIR, f"{task_id}_result.json")
-
-    # Обновляем статус задачи
-    with status_lock:
-        task_data[task_id] = {"status": "in progress", "format": "json"}
-    # ▸ Пишем строку в crawler_requests -----------------------------------
     if user is not None:
         with sqlite3.connect(DB_PATH) as conn:
             conn.execute(
@@ -114,254 +97,85 @@ def start_crawler(data: CrawlerRequest, background_tasks: BackgroundTasks, user 
                 VALUES (?, ?, ?, ?)
                 """,
                 (user["id"],                # гарантирует, что задача «чья-то»
-                 task_id,
-                 data.start_url,
-                 data.model_dump_json())
+                 data["jobid"],
+                 req.start_url,
+                 req.model_dump_json())
             )
-        
 
-    # Запускаем Scrapy через subprocess, передавая нужные аргументы
-    # Обратите внимание, что flexible_spider должен уметь получать task_id и config_path
-    # для дальнейшей работы
-    # Надо обсудить, запускать через scrapy API или оставить так
-    cmd = [
-        "scrapy",
-        "crawl",
-        "flexible_spider",
-        "-a", f"config_path={config_path}",
-        "-a", f"output_path={output_path}"
-    ]
-
-    # Функция для обновления статуса задачи
-    def run_crawler():
-        try:
-            subprocess.run(cmd, cwd=os.path.join(os.path.dirname(__file__), "..", "flex_crawler"))
-            with status_lock:
-                task_data[task_id]["status"] = "completed"
-            _history_update(task_id, status="completed")
-        except subprocess.CalledProcessError as e:
-            with status_lock:
-                task_data[task_id]["status"] = "failed"
-                task_data[task_id]["error"] = str(e)
-            _history_update(task_id, status="failed")
-
-    # Запускаем краулер в фоне
-    background_tasks.add_task(run_crawler)
-
-    return JSONResponse(
-        content={
-            "task_id": task_id,
-            "status": "crawler started"
-        },
-        status_code=200
-    )
+    return JSONResponse(status_code=201, content={"jobid": data["jobid"]})
 
 
-@app.get("/status/{task_id}")
-def get_status(task_id: str):
-    """
-    Эндпоинт для получения статуса задачи по Task ID.
-    Возвращает статус: in_progress, completed, или not_found.
-    """
-    with status_lock:
-        current_data = task_data.get(task_id, {})
-
-    if not current_data:
-        return JSONResponse(
-            content={
-                "task_id": task_id,
-                "description": "Такой задачи не существует"
-            },
-            status_code=404
+@app.get("/jobs/{jobid}/status")
+def job_status(jobid: str):
+    try:
+        resp = requests.get(
+            f"{SCRAPYD_URL}/listjobs.json",
+            params={"project": PROJECT_NAME},
+            timeout=5,
         )
-        
-    _history_update(task_id, status=current_data["status"])
-    
-    return JSONResponse(
-        content={
-            "task_id": task_id,
-            "status": current_data["status"]
-        },
-        status_code=200
-    )
+    except requests.RequestException as e:
+        raise HTTPException(status_code=502, detail=f"Ошибка связи с Scrapyd: {e}")
+
+    if resp.status_code != 200:
+        raise HTTPException(status_code=resp.status_code, detail="Scrapyd вернул ошибку")
+
+    jobs = resp.json()
+    for state in ("pending", "running", "finished"):
+        if any(j["id"] == jobid for j in jobs.get(state, [])):
+            _history_update(jobid, status=state)
+            return {"jobid": jobid, "status": state}
+
+    raise HTTPException(status_code=404, detail="Job not found")
 
 
-@app.get("/result/{task_id}")
-def get_result(task_id: str, output_format: Literal["json", "csv", "xml"] = "json"):
-    """
-    Эндпоинт для получения файла результата задачи по Task ID.
-    Возвращает файл в заданном формате, либо сообщение об ошибке в формате JSON.
-    """
-    with status_lock:
-        current_data = task_data.get(task_id, {})
-
-    # Проверяем наличие задачи
-    if not current_data:
-        return JSONResponse(
-            content={
-                "task_id": task_id,
-                "description": "Такой задачи не существует"
-            },
-            status_code=404
-        )
-
+@app.get("/jobs/{jobid}/result")
+def job_result(jobid: str, output_format: Literal["json", "csv", "xml"] = "json"):
     # Проверяем статус задачи
-    if current_data["status"] == "in progress":
+    status_resp = job_status(jobid)
+    status = status_resp.get("status")
+    if status != "finished":
         return JSONResponse(
-            content={
-                "task_id": task_id,
-                "status": "in progress",
-                "message": "Задание еще не выполнено. Попробуйте позже"
-            },
-            status_code=202  # 202 Accepted — запрос принят, но не завершен
+            status_code=202,
+            content={"jobid": jobid, "status": status, "message": "Job not finished yet"},
         )
 
-    if current_data["status"] == "failed":
-        raise JSONResponse(
-            status_code=404,
-            content={
-                "task_id": task_id,
-                "status": "failed",
-                "error": current_data.get("error", "Неизвестная ошибка")
-            }
-        )
-
-    # Путь к результату
-    result_path = os.path.join(RESULTS_DIR, f"{task_id}_result.json")
-    _history_update(task_id, status="completed", result_path=result_path)
-
-    # Проверяем существование файла
-    if not os.path.exists(result_path):
-        return JSONResponse(
-            content={
-                "task_id": task_id,
-                "description": "Файл для данной задачи не найден"
-            },
-            status_code=404
-        )
-    
-    # Проверяем, есть ли результат краулинга
-    with open(result_path, "r", encoding="utf-8") as f:
-        try:
-            items = json.load(f)
-            if not items:
-                return JSONResponse(
-                    content={
-                        "task_id": task_id,
-                        "description": "Ошибка при краулинге, ничего не найдено"
-                    },
-                    status_code=404
-                )
-        except json.JSONDecodeError:
-            return JSONResponse(
-                content={
-                    "task_id": task_id,
-                    "description": "Ошибка при чтении файла результатов"
-                },
-                status_code=404
-            )
-    
-    output_path = result_path.replace('.json', f'.{output_format}')
-    
-    if output_format == 'json':
-        return FileResponse(
-            path=output_path,
-            filename=f"{task_id}_result.json",
-            media_type="application/octet-stream"
-        )
- 
-    if output_format == "csv":
-        with open(output_path, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=items[0].keys())
-            writer.writeheader()
-            writer.writerows(items)
-        
-        return FileResponse(
-            path=output_path,
-            filename=f"{task_id}_result.csv",
-            media_type="application/octet-stream"
-        )
-    
-    if output_format == "xml":
-        root = ET.Element("items")
-        for item in items:
-            item_element = ET.SubElement(root, "item")
-            for key, value in item.items():
-                child = ET.SubElement(item_element, key.replace(" ", "_"))
-                child.text = str(value).replace("\xa0", " ")
-        tree = ET.ElementTree(root)
-        tree.write(output_path, encoding="utf-8", xml_declaration=True)
-
-        return FileResponse(
-            path=output_path,
-            filename=f"{task_id}_result.xml",
-            media_type="application/octet-stream"
-        )
-
-    return JSONResponse(
-            content={
-                "task_id": task_id,
-                "description": "Неподдерживаемый формат файла"
-            },
-            status_code=422
-        )
-
-
-@app.delete("/delete/{task_id}")
-def delete_files(task_id: str, user = Depends(get_current_user)):
-
-    """
-    Эндпоинт для удаления промежуточной схемы и результата задачи по Task ID.
-    Возвращает JSON с результатом: какие файлы были удалены и статус задачи.
-    """
-    with status_lock:
-        current_data = task_data.get(task_id, {})
-
-    if not current_data:
-        return JSONResponse(
-            content={
-                "task_id": task_id,
-                "description": "Такой задачи не существует"
-            },
-            status_code=404
-        )
-
-    # Путь к файлам
-    config_path = os.path.join(SCHEMAS_DIR, f"{task_id}_config.json")
-    output_format = current_data["format"]
-    output_path = os.path.join(RESULTS_DIR, f"{task_id}_result.{output_format}")
-
-    # Удаление файлов, если они существуют
-    files_deleted = []
-    for file_path in [config_path, output_path]:
-        if os.path.exists(file_path):
-            os.remove(file_path)
-            files_deleted.append(file_path)
-
-    # Удаляем запись о задаче из словаря статусов
-    del task_data[task_id]
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute(
-            "DELETE FROM crawler_requests WHERE task_id=? AND user_id=?",
-            (task_id, user["id"])
-        )
-
-    return JSONResponse(
-        content={
-            "task_id": task_id,
-            "status": "deleted",
-            "deleted_files": files_deleted,
-            "message": (
-                "Файлы и данные были успещно удалены"
-                if files_deleted else
-                "Файлов нет, но остальные данные были удалены"
-            )
-        },
-        status_code=200
+    jl_path = os.path.join(
+        ITEMS_DIR, PROJECT_NAME, "flexible_spider", f"{jobid}.jl"
     )
+    if not os.path.exists(jl_path):
+        raise HTTPException(status_code=404, detail="Result file not found")
 
-from history import router as history_router
-app.include_router(history_router)
+    # _history_update(jobid, status="finished", result_path=jl_path)
 
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    try:
+        items = read_items_from_jl(jl_path)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Result file not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка при чтении результатов: {e}")
+
+    tmp_base = f"/tmp/{jobid}"
+
+    if output_format == "json":
+        out_path = tmp_base + ".json"
+        try:
+            write_json_file(items, out_path)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Ошибка при создании JSON: {e}")
+        return FileResponse(out_path, filename=f"{jobid}.json", media_type="application/json")
+
+    if output_format == "csv":
+        out_path = tmp_base + ".csv"
+        try:
+            write_csv_file(items, out_path)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Ошибка при создании CSV: {e}")
+        return FileResponse(out_path, filename=f"{jobid}.csv", media_type="text/csv")
+
+    # format == "xml"
+    out_path = tmp_base + ".xml"
+    try:
+        write_xml_file(items, out_path)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка при создании XML: {e}")
+    return FileResponse(out_path, filename=f"{jobid}.xml", media_type="application/xml")

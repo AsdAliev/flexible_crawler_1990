@@ -1,0 +1,75 @@
+{
+    "start_url": "https://quotes.toscrape.com/",
+    "crawler_settings": {
+        "pagination": {
+            "enabled": true,
+            "next_page_selector": {
+                "path": "//li[@class='next']/a",
+                "selector_type": "xpath"
+            },
+            "max_pages": 3
+        }
+    },
+    "meta": [
+        {
+            "object_name": "Цитата",
+            "object_selector": {
+                "path": "//div[@class='quote']",
+                "selector_type": "xpath"
+            },
+            "attributes": [
+                {
+                    "attribute_name": "Текст цитаты",
+                    "attribute_selector": {
+                        "path": ".//span[@class='text']/text()",
+                        "selector_type": "xpath"
+                    },
+                    "attribute_type": "simple"
+                },
+                {
+                    "attribute_name": "Автор",
+                    "attribute_selector": {
+                        "path": ".//small[@class='author']/text()",
+                        "selector_type": "xpath"
+                    },
+                    "attribute_type": "simple"
+                },
+                {
+                    "attribute_name": "Теги",
+                    "attribute_selector": {
+                        "path": ".//div[@class='tags']/a[@class='tag']/text()",
+                        "selector_type": "xpath"
+                    },
+                    "attribute_type": "array",
+                    "delimiter": ", "
+                },
+                {
+                    "attribute_name": "Подробнее об авторе",
+                    "attribute_selector": {
+                        "path": ".//a",
+                        "selector_type": "xpath"
+                    },
+                    "attribute_type": "link",
+                    "linked_attributes": [
+                        {
+                            "attribute_name": "Дата рождения",
+                            "attribute_selector": {
+                                "path": "//span[@class='author-born-date']/text()",
+                                "selector_type": "xpath"
+                            },
+                            "attribute_type": "simple"
+                        },
+                        {
+                            "attribute_name": "Место рождения",
+                            "attribute_selector": {
+                                "path": "//span[@class='author-born-location']/text()",
+                                "selector_type": "xpath"
+                            },
+                            "attribute_type": "simple"
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
