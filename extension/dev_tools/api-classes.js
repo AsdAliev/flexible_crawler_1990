@@ -1,4 +1,4 @@
-import { appSettings } from "../app-settings";
+import { appSettings } from "../app-settings.js";
 export class PathData {
     /**
      * 
