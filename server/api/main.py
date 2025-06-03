@@ -63,13 +63,48 @@ def _history_update(task_id: str, **cols) -> None:
         )
 
 
+def _scrapyd_request(path: str, method: str = "GET", data: dict | None = None, params: dict | None = None) -> dict:
+    """
+    Внутренний хелпер для запросов к Scrapyd.
+    Возвращает распарсенный JSON или бросает HTTPException.
+    """
+    url = f"{SCRAPYD_URL}/{path}"
+    try:
+        if method.upper() == "POST":
+            resp = requests.post(url, data=data, timeout=5)
+        else:
+            resp = requests.get(url, params=params, timeout=5)
+    except requests.RequestException as e:
+        raise HTTPException(status_code=502, detail=f"Ошибка связи с Scrapyd: {e}")
+
+    if resp.status_code != 200:
+        raise HTTPException(status_code=resp.status_code, detail="Scrapyd вернул ошибку")
+
+    try:
+        return resp.json()
+    except ValueError:
+        raise HTTPException(status_code=500, detail="Невалидный JSON от Scrapyd")
+
+
+def _fetch_task_status(task_id: str) -> str:
+    """
+    Возвращает строку состояния задачи: pending, running или finished.
+    Бросает HTTPException(404), если task_id не найден.
+    """
+    data = _scrapyd_request("listjobs.json", method="GET", params={"project": PROJECT_NAME})
+    for state in ("pending", "running", "finished"):
+        if any(j["id"] == task_id for j in data.get(state, [])):
+            return state
+    raise HTTPException(status_code=404, detail="Job not found")
+
+
 @app.get("/")
 def read_root():
     return {"message": "Flexible Crawler API is running"}
 
 
-@app.post("/jobs/", status_code=201)
-def schedule_job(req: CrawlerRequest, user=Depends(get_current_user)):
+@app.post("/start_crawler")
+def start_crawler(req: CrawlerRequest, user=Depends(get_current_user)):
     payload = {
         "project": PROJECT_NAME,
         "spider": "flexible_spider",
@@ -102,80 +137,148 @@ def schedule_job(req: CrawlerRequest, user=Depends(get_current_user)):
                  req.model_dump_json())
             )
 
-    return JSONResponse(status_code=201, content={"jobid": data["jobid"]})
+    return JSONResponse(status_code=200, content={"task_id": data["jobid"], "status": "crawler started"})
 
 
-@app.get("/jobs/{jobid}/status")
-def job_status(jobid: str):
+@app.get("/status/{task_id}")
+def get_status(task_id: str):
+    """
+    Эндпоинт для получения статуса задачи по Task ID.
+    Возвращает статус: pending, running, finished.
+    """
     try:
-        resp = requests.get(
-            f"{SCRAPYD_URL}/listjobs.json",
-            params={"project": PROJECT_NAME},
-            timeout=5,
-        )
-    except requests.RequestException as e:
-        raise HTTPException(status_code=502, detail=f"Ошибка связи с Scrapyd: {e}")
+        state = _fetch_task_status(task_id)
+    except HTTPException as exc:
+        if exc.status_code == 404:
+            return JSONResponse(
+                status_code=404,
+                content={"task_id": task_id, "description": "Такой задачи не существует"},
+            )
+        raise
 
-    if resp.status_code != 200:
-        raise HTTPException(status_code=resp.status_code, detail="Scrapyd вернул ошибку")
-
-    jobs = resp.json()
-    for state in ("pending", "running", "finished"):
-        if any(j["id"] == jobid for j in jobs.get(state, [])):
-            _history_update(jobid, status=state)
-            return {"jobid": jobid, "status": state}
-
-    raise HTTPException(status_code=404, detail="Job not found")
+    _history_update(task_id, status=state)
+    return JSONResponse(content={"task_id": task_id, "status": state})
 
 
-@app.get("/jobs/{jobid}/result")
-def job_result(jobid: str, output_format: Literal["json", "csv", "xml"] = "json"):
+@app.get("/result/{task_id}")
+def get_result(task_id: str, output_format: Literal["json", "csv", "xml"] = "json"):
     # Проверяем статус задачи
-    status_resp = job_status(jobid)
-    status = status_resp.get("status")
-    if status != "finished":
+    try:
+        state = _fetch_task_status(task_id)
+    except HTTPException as exc:
+        if exc.status_code == 404:
+            return JSONResponse(
+                status_code=404,
+                content={"task_id": task_id, "description": "Такой задачи не существует"},
+            )
+        raise
+
+    if state != "finished":
+        _history_update(task_id, status=state)
         return JSONResponse(
             status_code=202,
-            content={"jobid": jobid, "status": status, "message": "Job not finished yet"},
+            content={
+                "task_id": task_id,
+                "status": state,
+                "message": "Задание еще не выполнено. Попробуйте позже",
+            },
         )
 
-    jl_path = os.path.join(
-        ITEMS_DIR, PROJECT_NAME, "flexible_spider", f"{jobid}.jl"
-    )
+    jl_path = os.path.join(ITEMS_DIR, PROJECT_NAME, "flexible_spider", f"{task_id}.jl")
     if not os.path.exists(jl_path):
-        raise HTTPException(status_code=404, detail="Result file not found")
+        return JSONResponse(
+            status_code=404,
+            content={"task_id": task_id, "description": "Файл для данной задачи не найден"},
+        )
 
-    # _history_update(jobid, status="finished", result_path=jl_path)
-
+    _history_update(task_id, status=state, result_path=jl_path)
     try:
         items = read_items_from_jl(jl_path)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Result file not found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка при чтении результатов: {e}")
+        if not items:
+            return JSONResponse(
+                status_code=404,
+                content={"task_id": task_id, "description": "Ошибка при краулинге, ничего не найдено"},
+            )
+    except Exception:
+        return JSONResponse(
+            status_code=404,
+            content={"task_id": task_id, "description": "Ошибка при чтении файла результатов"},
+        )
 
-    tmp_base = f"/tmp/{jobid}"
+    tmp_base = f"/tmp/{task_id}"
 
     if output_format == "json":
         out_path = tmp_base + ".json"
         try:
             write_json_file(items, out_path)
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Ошибка при создании JSON: {e}")
-        return FileResponse(out_path, filename=f"{jobid}.json", media_type="application/json")
+        except Exception:
+            return JSONResponse(
+                status_code=500,
+                content={"task_id": task_id, "description": "Ошибка при создании JSON"},
+            )
+        return FileResponse(path=out_path, filename=f"{task_id}.json", media_type="application/octet-stream")
 
     if output_format == "csv":
         out_path = tmp_base + ".csv"
         try:
             write_csv_file(items, out_path)
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Ошибка при создании CSV: {e}")
-        return FileResponse(out_path, filename=f"{jobid}.csv", media_type="text/csv")
+        except Exception:
+            return JSONResponse(
+                status_code=500,
+                content={"task_id": task_id, "description": "Ошибка при создании CSV"},
+            )
+        return FileResponse(path=out_path, filename=f"{task_id}.csv", media_type="application/octet-stream")
 
-    # format == "xml"
     out_path = tmp_base + ".xml"
     try:
         write_xml_file(items, out_path)
+    except Exception:
+        return JSONResponse(
+            status_code=500,
+            content={"task_id": task_id, "description": "Ошибка при создании XML"},
+        )
+    return FileResponse(path=out_path, filename=f"{task_id}.xml", media_type="application/octet-stream")
+
+
+@app.delete("/delete/{task_id}")
+def delete_result(task_id: str, user=Depends(get_current_user)):
+    """
+    Эндпоинт для удаления результата задачи (файла .jl) по task ID.
+    Возвращает JSON с информацией о том, какие файлы были удалены.
+    """
+    if user is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    # Путь до .jl-файла
+    jl_path = os.path.join(ITEMS_DIR, PROJECT_NAME, "flexible_spider", f"{task_id}.jl")
+
+    if not os.path.exists(jl_path):
+        return JSONResponse(
+            status_code=404,
+            content={"jobid": task_id, "description": "Такой задачи не существует или файл уже удалён"},
+        )
+
+    try:
+        os.remove(jl_path)
+        deleted = [jl_path]
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка при создании XML: {e}")
-    return FileResponse(out_path, filename=f"{jobid}.xml", media_type="application/xml")
+        raise HTTPException(status_code=500, detail=f"Ошибка при удалении файла: {e}")
+
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute(
+                "DELETE FROM crawler_requests WHERE task_id=? AND user_id=?",
+                (task_id, user["id"]),
+            )
+    except Exception:
+        deleted.append("Ошибка при удалении записи из БД")
+
+    return JSONResponse(
+        status_code=200,
+        content={
+            "jobid": task_id,
+            "status": "deleted",
+            "deleted_files": deleted,
+            "message": "Результат задачи успешно удалён",
+        },
+    )
