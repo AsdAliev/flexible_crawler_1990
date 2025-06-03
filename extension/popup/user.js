@@ -208,7 +208,7 @@ export async function tryRefresh() {
     const refreshToken = localStorage.getItem('refresh_token');
     if (!refreshToken) return false;                // нечем обновлять
 
-    const res = await fetch('http://localhost:8000/refresh', {
+    const res = await fetch(appSettings.serverDomain + 'refresh', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refresh_token: refreshToken }),

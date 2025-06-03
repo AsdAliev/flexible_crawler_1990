@@ -86,7 +86,7 @@ def init_history_table() -> None:
     • task_id – строковый идентификатор задачи в Scrapy/планировщике;
     • start_url – URL, с которого начали краулинг;
     • payload_json – исходная конфигурация паука (храним целиком);
-    • status – текущее состояние (‘in progress’, ‘completed’, ‘error’);
+    • status – текущее состояние (‘pending’, ‘running’, ‘finished’);
     • result_path – относительный путь к сохранённому файлу результата;
     • created_at / updated_at – метки времени.
     """
@@ -101,7 +101,7 @@ def init_history_table() -> None:
             task_id       TEXT       NOT NULL UNIQUE,
             start_url     TEXT       NOT NULL,
             payload_json  TEXT       NOT NULL,
-            status        TEXT       NOT NULL DEFAULT 'in progress',
+            status        TEXT       NOT NULL DEFAULT 'pending',
             result_path   TEXT,
             created_at    TIMESTAMP  NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at    TIMESTAMP  NOT NULL DEFAULT CURRENT_TIMESTAMP,
