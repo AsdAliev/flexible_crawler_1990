@@ -9,12 +9,12 @@ from scrapy.item import Item
 
 class KafkaPipeline:
     """
-    1. Копит элементы с одинаковым «object_id» (по полю «Позиция в поиске»).
+    1. Копит элементы с одинаковым «object_id» (по полю «Объект»).
     2. Объединяет их словарём .update().
     3. В конце спайдера отправляет в Kafka ровно по одному сообщению на object_id.
     """
 
-    OBJECT_ID_FIELD = "Позиция в поиске"
+    OBJECT_ID_FIELD = "Объект"
 
     def __init__(self) -> None:
         brokers = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
@@ -58,11 +58,11 @@ class KafkaPipeline:
 
 class MergeAndSavePipeline:
     """
-    1. Буферизует все items с одинаковым object_id (по полю 'Позиция в поиске').
+    1. Буферизует все items с одинаковым object_id (по полю 'Объект').
     2. В close_spider = мерджит буфер и записывает каждое итоговое значение в .jl.
     """
 
-    OBJECT_ID_FIELD = "Позиция в поиске"
+    OBJECT_ID_FIELD = "Объект"
 
     def open_spider(self, spider: Spider):
         # Определяем директорию, куда писать .jl

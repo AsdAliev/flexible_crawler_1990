@@ -61,6 +61,7 @@ class FlexibleSpider(scrapy.Spider):
     def parse(self, response):
         meta_objects = self.config.get("meta", [])
         for obj in meta_objects:
+            object_name = obj.get('object_name')
             object_selector_info = obj.get("object_selector", {})
             object_path = object_selector_info.get("path", "")
             object_selector_type = object_selector_info.get("selector_type", "xpath")
@@ -70,7 +71,7 @@ class FlexibleSpider(scrapy.Spider):
             elements = get_element_by_selector(response, object_path, object_selector_type)
             for element in elements:
                 self.object_counter += 1
-                item_data = {"Позиция в поиске": self.object_counter}
+                item_data = {"Объект": f'{object_name} {self.object_counter}'}
 
                 # Сначала обрабатываем все атрибуты, кроме типа "link"
                 for attr in obj.get("attributes", []):
@@ -87,7 +88,7 @@ class FlexibleSpider(scrapy.Spider):
                                 callback=self.parse_links,
                                 meta={
                                     "linked_attributes": attr.get("linked_attributes", []),
-                                    "item_data": {"Позиция в поиске": self.object_counter}
+                                    "item_data": {"Объект": f'{object_name} {self.object_counter}'}
                                 },
                                 dont_filter=True
                             )
