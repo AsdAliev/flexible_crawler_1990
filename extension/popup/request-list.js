@@ -5,6 +5,12 @@ import { showResultPage } from '../result-page/result-page.js';
 import * as userRequests from '../storage/user-request-storage.js';
 import * as User from './user.js';
 
+const REQUESTSTATUS = {
+    inQueue: 'pending',
+    running: 'running',
+    finished: 'finished',
+}
+
 /** @type {requestDB} */
 let requestHandler;
 
@@ -45,15 +51,15 @@ function createRequestCard(request) {
         <div class="ms-2 flex-shrink-1"
             style="flex: 1 1 60%; min-width: 0;">
             <div class="fw-bold">
-                <a href="#" class="${request.status == 'crawler started' || request.status == 'in progress' ? 'link-secondary' : 'link-success'} link-offset-2 link-underline-opacity-25 link-underline-opacity-100-hover">
+                <a href="#" class="${request.status != REQUESTSTATUS.finished ? 'link-secondary' : 'link-success'} link-offset-2 link-underline-opacity-25 link-underline-opacity-100-hover">
                     ${request.name}
                 </a>
             </div>
             <span>${formatDate(new Date(request.createdAt))}</span>
             <span class="d-block text-truncate text-secondary" style="max-width: 350px; font-size: 0.85rem;">${request.request.start_url}</span>
         </div>
-        <span class="badge ${request.status == 'crawler started' || request.status == 'in progress' ? 'text-bg-warning' : 'text-bg-success'} rounded-pill">
-            ${request.status == 'crawler started' || request.status == 'in progress' ? 'Выполняется' : 'Готово'}
+        <span class="badge ${request.status != REQUESTSTATUS.finished ? 'text-bg-warning' : 'text-bg-success'} rounded-pill">
+            ${request.status != REQUESTSTATUS.finished ? 'Выполняется' : 'Готово'}
         </span>
         <div class="dropdown dropstart align-self-center ms-2">
             <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -61,8 +67,8 @@ function createRequestCard(request) {
             </button>
             <ul class="dropdown-menu">
                 <li><button class="dropdown-item" type="button" >Скачать схему запроса</button></li>
-                <li><button class="dropdown-item" type="button" ${request.status == 'crawler started' || request.status == 'in progress' ? 'disabled' : ''} >Повторить запрос</button></li>
-                <li><button class="dropdown-item" type="button" ${request.status == 'crawler started' || request.status == 'in progress' ? 'disabled' : ''} >Скачать результат</button></li>
+                <li><button class="dropdown-item" type="button" ${request.status != REQUESTSTATUS.finished ? 'disabled' : ''} >Повторить запрос</button></li>
+                <li><button class="dropdown-item" type="button" ${request.status != REQUESTSTATUS.finished ? 'disabled' : ''} >Скачать результат</button></li>
                 <li><button class="dropdown-item" type="button">Удалить</button></li>
             </ul>
         </div>
@@ -122,13 +128,13 @@ function createRequestCard(request) {
         }
     });
 
-    if (request.status == 'crawler started' || request.status == 'in progress') {
+    if (request.status != REQUESTSTATUS.finished) {
         intId = setInterval(() => {
             getStatus(request.id)
                 .then(status => {
-                    if (status === 'in progress' || status == 'crawler started') {
+                    if (status != REQUESTSTATUS.finished) {
                         return;
-                    } else if (status === 'completed') {
+                    } else if (status == REQUESTSTATUS.finished) {
                         requestHandler.updateStatus(request.id, status);
                         card.querySelector('a').classList.remove('link-secondary');
                         card.querySelector('a').classList.add('link-success');
@@ -145,7 +151,7 @@ function createRequestCard(request) {
                 });
         }, 2000);
     }
-    if (request.status == 'completed') {
+    if (request.status == REQUESTSTATUS.finished) {
         card.querySelector('a').onclick = () => { getResult(request.id, appSettings.downloadType, request.name, true); };
     }
     return card;
@@ -155,7 +161,7 @@ function createRequestCard(request) {
  * Запрашивает статус задачи по её ID.
  *
  * @param {string} taskId — ID задачи
- * @returns {Promise<'in progress'|'completed'|null>} — статус задачи или null, если задача не найдена
+ * @returns {Promise<REQUESTSTATUS.finished| REQUESTSTATUS.inQueue| REQUESTSTATUS.running | null>} — статус задачи или null, если задача не найдена
  */
 async function getStatus(taskId) {
     const url = appSettings.serverDomain + `status/${encodeURIComponent(taskId)}`;
@@ -174,7 +180,6 @@ async function getStatus(taskId) {
         if (response.ok) {
             const data = await response.json();
             console.log(`Статус задачи ${taskId}:`, data.status);
-            // Вернём статус строки ('in progress' или 'completed')
             return data.status;
         }
 

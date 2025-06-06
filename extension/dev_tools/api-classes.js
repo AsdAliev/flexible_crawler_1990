@@ -1,3 +1,5 @@
+import { appSettings } from "../app-settings.js";
+
 export class PathData {
     /**
      * 
@@ -111,7 +113,7 @@ export class CrawlerRequest {
      * @returns {Promise}
      */
     async sendParsingTask(token = undefined) {
-        const apiUrl = 'http://localhost:8000/start_crawler';
+        const apiUrl = appSettings.serverDomain + 'start_crawler';
         try {
             const response = await fetch(apiUrl, {
                 method: "POST",
